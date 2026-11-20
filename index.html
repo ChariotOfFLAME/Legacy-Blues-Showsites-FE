@@ -223,14 +223,14 @@ li.dim .nm2{color:var(--muted);text-decoration:line-through}
 .dialog>header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .dialog h2{font-family:var(--font-display);font-size:20px;margin:0}
 .mhint{margin:0;padding:10px 18px 0;color:var(--muted);font-size:12px}
-.mcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;padding:12px 18px;overflow-y:auto;min-height:0}
+.mcols{align-items:start;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;padding:12px 18px;overflow-y:auto;min-height:0}
 .mcols section{min-width:0}
-.mtools{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;align-items:center}
-.mtools select{flex:1 1 108px;min-height:36px;padding:4px 8px}
-.mtools .ghost{min-height:36px}
+.mtools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 34px 34px;gap:6px;margin:0 0 8px;align-items:center}
+.mtools select{min-height:36px;padding:4px 6px;font-size:13px;text-overflow:ellipsis}
+.mtools .ghost{min-height:36px;padding:0;text-align:center}
+.mcols h3 span:first-child{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.qtag{font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--accent);white-space:nowrap}
 .mconf{margin-top:8px;width:100%}
-.qhint{margin:0 0 8px;font-size:12px;color:var(--muted)}
-.qhint b{color:var(--ink)}
 ul.dl li .qn{font-family:var(--font-mono);font-size:12px;color:var(--muted);min-width:1.6em;text-align:right}
 ul.dl li.nextup{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 ul.dl li .nxt{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);white-space:nowrap}
@@ -335,7 +335,7 @@ ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
       <h2 id="wheelTitle">Choose the wheel</h2>
       <button class="ghost" data-act="wclose">Close</button>
     </header>
-    <p class="mhint">Drag sites between the lists, or use the button on each row. Filters and sorting only change what you see here, so they never move a site, and a site you move stays moved when you clear them. Sorting a list and confirming it saves that order, and the site at the top of "Not on the wheel" is the next to move onto the wheel after a spin. Not Viable sites can't go on the wheel. Each column has its own Confirm button, which saves that column as it looks now. Confirm all saves both, and Revert goes back to what is saved.</p>
+    <p class="mhint">Drag sites between the lists, or use the buttons. Filters and sorting are only a view until you confirm.</p>
     <div class="mcols" id="mCols"></div>
     <footer>
       <span class="note" id="mNote"></span>
@@ -1081,25 +1081,25 @@ function dirtyDraft(){
   var A=S.ac[mAc];
   return A.wheel.join()!==dW.join()||savedO().join()!==dO.join()||!!(mv.W.k||mv.O.k);
 }
-function modalCol(c,title,hint,what,confirm){
-  return '<section><h3>'+title+' <span class="meta" id="m'+c+'Count"></span></h3>'+(hint?'<p class="qhint">'+hint+'</p>':'')+
+function modalCol(c,title,tag,what,confirm){
+  return '<section><h3><span>'+title+(tag?' <span class="qtag" title="The line runs top to bottom. A site that leaves the wheel joins the bottom. Not Viable and Not inspected sites are skipped.">'+tag+'</span>':'')+'</span> <span class="meta" id="m'+c+'Count"></span></h3>'+
     '<div class="mtools" data-col="'+c+'">'+
       ["r","m","k"].map(function(k){return '<select data-mv="'+k+'" data-col="'+c+'" aria-label="'+{r:"Filter",m:"Filter",k:"Sort"}[k]+' '+what+' by '+{r:"viability",m:"theater",k:"order"}[k]+'"></select>'}).join("")+
-      '<button type="button" class="ghost" data-act="wdir" data-col="'+c+'" aria-label="Reverse the sort direction">&uarr;</button>'+
-      '<button type="button" class="ghost" data-act="wresetview" data-col="'+c+'">Reset view</button></div>'+
+      '<button type="button" class="ghost" data-act="wdir" data-col="'+c+'" aria-label="Reverse the sort direction" title="Sort direction">&uarr;</button>'+
+      '<button type="button" class="ghost" data-act="wresetview" data-col="'+c+'" aria-label="Reset filters and sort" title="Reset filters and sort">&#10005;</button></div>'+
     '<ul class="dl" id="m'+c+'" aria-label="Sites '+what+'"></ul>'+
     '<button type="button" class="btn sm mconf" data-act="wconfcol" data-col="'+c+'" id="mConf'+c+'">'+confirm+'</button></section>';
 }
 function buildModal(){
   $("mCols").innerHTML=modalCol("W","On the wheel","","on the wheel","Confirm wheel")+
-    modalCol("O","Not on the wheel",'<b>&#9650; The top site is next</b> onto the wheel after a spin. The line runs top to bottom, and a site that leaves the wheel joins the bottom. Not Viable and Not inspected sites are skipped.',"not on the wheel","Confirm list");
+    modalCol("O","Not on the wheel","&#9650; top is next","not on the wheel","Confirm list");
 }
 function fillTools(){
   var maps={},none=0;
   S.sites.forEach(function(s){if(s.map)maps[s.map]=1;else none++});
-  var ratingOpts='<option value="">All viability</option>'+RATINGS.map(function(r){return '<option value="'+r[0]+'">'+r[1]+'</option>'}).join("");
-  var mapOpts='<option value="">All theaters</option>'+(none?'<option value="__none">No theater set</option>':'')+Object.keys(maps).sort().map(function(m){return '<option value="'+esc(m)+'">'+esc(mapLabel(m))+'</option>'}).join("");
-  var sortOpts='<option value="">Sort: saved order</option><option value="r">Sort: viability</option><option value="m">Sort: theater</option><option value="f">Sort: times flown</option>';
+  var ratingOpts='<option value="">Any viability</option>'+RATINGS.map(function(r){return '<option value="'+r[0]+'">'+r[1]+'</option>'}).join("");
+  var mapOpts='<option value="">Any theater</option>'+(none?'<option value="__none">No theater set</option>':'')+Object.keys(maps).sort().map(function(m){return '<option value="'+esc(m)+'">'+esc(mapLabel(m))+'</option>'}).join("");
+  var sortOpts='<option value="">No sort</option><option value="r">By viability</option><option value="m">By theater</option><option value="f">By flown</option>';
   ["W","O"].forEach(function(c){
     var box=document.querySelector('.mtools[data-col="'+c+'"]');
     box.querySelector('[data-mv="r"]').innerHTML=ratingOpts;
@@ -1250,7 +1250,7 @@ document.addEventListener("change",function(e){
   else if(act==="rate")setRating(ac,id,el.value);
   else if(act==="rename"){var s=site(id),v=el.value.trim();if(!s)return;if(!v){el.value=s.name;return}if(v!==s.name){s.name=v;changed()}}
   else if(act==="flights"){setFlights(ac,id,el.value);var s2=site(id);if(s2)el.value=s2.flights[ac]}
-  else if(act==="map"){var s3=site(id);if(!s3)return;var mv=el.value.trim();if(mv!==(s3.map||"")){s3.map=mv;changed()}}
+  else if(act==="map"){var s3=site(id);if(!s3)return;var mval=el.value.trim();if(mval!==(s3.map||"")){s3.map=mval;changed()}}
 });
 $("filterText").addEventListener("input",function(e){filterText=e.target.value;renderRows()});
 document.addEventListener("input",function(e){
