@@ -259,6 +259,8 @@ ul.dl li .nm2{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:500}
 ul.dl li .fl{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
 .grip{color:var(--muted);letter-spacing:-3px;user-select:none;font-weight:700}
 ul.dl li.dragging{opacity:.4}
+ul.dl li.sep{border:0;background:transparent;padding:0;min-height:0;cursor:default;margin:10px 0 4px}
+ul.dl li.sep .ghost{width:100%;text-align:left;font-weight:600;color:var(--muted);border-top:1px solid var(--line);border-radius:0;padding:8px 4px}
 ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
 .dialog>footer{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line)}
 .dialog>footer .note{margin-right:auto;color:var(--muted);font-size:12px}
@@ -1003,7 +1005,7 @@ function showTab(t){
 }
 
 /* ---------- wheel editor (lightbox) ---------- */
-var mAc="a4",dW=[],dO=[],dragId=null,lastFocus=null;
+var mAc="a4",dW=[],dO=[],dragId=null,lastFocus=null,offOpen=false;
 var SORTS=[["r","Viability",["Ideal first","Ideal last"]],["m","Theater",["A to Z","Z to A"]],["f","Times flown",["Fewest first","Most first"]]];
 var mv={W:{r:[],m:[],s:[],dir:{r:1,m:1,f:1}},O:{r:[],m:[],s:[],dir:{r:1,m:1,f:1}}}; /* s lists the ticked sorts in the order they were ticked, which is their priority */ /* r and m hold the ticked viability and theater values; empty means any */
 /* In this editor the "Not on the wheel" list runs top to bottom in the order sites will be drawn: the top site is next. The saved list keeps its own order (next = last), so it is flipped on the way in and out. */
@@ -1044,6 +1046,13 @@ function visible(c){
     return true;
   });
 }
+function offIsOpen(){return offOpen||mv.O.r.some(function(x){return x==="notviable"||x==="uninspected"})}
+/* the rows you can see in a column, top to bottom */
+function shown(c){
+  var v=visible(c);
+  if(c!=="O")return v;
+  return v.filter(function(id){return eligible(mAc,id)}).concat(offIsOpen()?v.filter(function(id){return !eligible(mAc,id)}):[]);
+}
 function diffLists(saved,eff){
   var ss={},es={};saved.forEach(function(x){ss[x]=1});eff.forEach(function(x){es[x]=1});
   var cs=saved.filter(function(x){return es[x]}),ce=eff.filter(function(x){return ss[x]});
@@ -1067,7 +1076,7 @@ function partsO(d){var r=[];if(d.add.length)r.push(d.add.length+" in");if(d.rem.
 function mLi(id,list,pos,isNext){
   var s=site(id),lock=list==="O"&&s.rating[mAc]==="notviable";
   var cls=(lock?"dim":"")+(isNext?" nextup":"");
-  var q=list==="O"?'<span class="qn" title="Place in line for the wheel">'+pos+'</span>':"";
+  var q=list==="O"?'<span class="qn" title="'+(pos?"Place in line for the wheel":"Not in line for the wheel")+'">'+(pos||"&ndash;")+'</span>':"";
   return '<li draggable="true" data-id="'+id+'"'+(cls?' class="'+cls.trim()+'"':'')+'><span class="grip" aria-hidden="true">&#8942;&#8942;</span>'+q+nm2(s)+(isNext?'<span class="nxt">&#9650; Next</span>':'')+pill(s.rating[mAc])+
     '<span class="fl" title="Times flown">'+s.flights[mAc]+'</span>'+
     '<button class="ghost" data-act="wmove" data-id="'+id+'" aria-label="'+(list==="W"?"Move off the wheel: ":"Move onto the wheel: ")+esc(s.name)+'"'+(lock?" disabled":"")+'>'+(list==="W"?"Remove &rarr;":"&larr; Add")+'</button></li>';
@@ -1076,9 +1085,18 @@ function renderModal(){
   ["W","O"].forEach(function(c){
     var vis=visible(c),all=(c==="W"?dW:dO),ul=$("m"+c),v=mv[c];
     var filtered=!!(v.r.length||v.m.length);
-    var order=c==="O"?effective("O"):null,nid=null;
-    if(order)for(var oi=0;oi<order.length;oi++){if(eligible(mAc,order[oi])){nid=order[oi];break}}
-    ul.innerHTML=vis.length?vis.map(function(id){return mLi(id,c,order?order.indexOf(id)+1:0,id===nid)}).join(""):'<li class="ph">'+(all.length&&filtered?"No sites match these filters":"Drop sites here")+'</li>';
+    var html;
+    if(c==="O"){
+      /* like the spinner feed: sites that can come back onto the wheel first, the rest in a collapsible group at the bottom */
+      var line=effective("O").filter(function(id){return eligible(mAc,id)}),nid=line[0];
+      var vE=vis.filter(function(id){return eligible(mAc,id)}),vN=vis.filter(function(id){return !eligible(mAc,id)});
+      var totalN=dO.filter(function(id){return !eligible(mAc,id)}).length;
+      var open=offIsOpen();
+      html=vE.map(function(id){return mLi(id,c,line.indexOf(id)+1,id===nid)}).join("");
+      if(totalN)html+='<li class="sep"><button type="button" class="ghost" data-act="woff" aria-expanded="'+open+'">'+(open?"&#9662;":"&#9656;")+' Not available for the wheel ('+(filtered?vN.length+" of "+totalN:totalN)+')</button></li>'+(open?vN.map(function(id){return mLi(id,c,0,false)}).join(""):"");
+      if(!vE.length&&!totalN)html="";
+    }else html=vis.map(function(id){return mLi(id,c,0,false)}).join("");
+    ul.innerHTML=html?html:'<li class="ph">'+(all.length&&filtered?"No sites match these filters":"Drop sites here")+'</li>';
     $("m"+c+"Count").textContent=filtered?vis.length+" of "+all.length+" sites":all.length+" sites";
     var box=document.querySelector('.mtools[data-col="'+c+'"]');
     [].forEach.call(box.querySelectorAll("select[data-mv]"),function(sel){sel.value=v[sel.getAttribute("data-mv")]});
@@ -1147,7 +1165,7 @@ function fillTools(){
 }
 function openWheel(ac){
   mAc=ac;dW=S.ac[ac].wheel.slice();dO=S.ac[ac].recent.slice().reverse();lastFocus=document.activeElement;
-  resetView("W");resetView("O");fillTools();
+  resetView("W");resetView("O");fillTools();offOpen=false;
   $("wheelTitle").textContent="Choose the "+AC_LABEL[ac]+" wheel";
   $("wheelModal").hidden=false;document.body.style.overflow="hidden";
   renderModal();$("wheelDialog").focus();
@@ -1160,7 +1178,8 @@ function closeWheel(){
 function moveDraft(id,list,idx){
   var s=site(id);if(!s)return;
   if(list==="W"&&s.rating[mAc]==="notviable"){toast("Not Viable sites stay off the wheel");return}
-  var vis=visible(list).filter(function(x){return x!==id});
+  if(list==="O"&&!eligible(mAc,id))offOpen=true; /* so a site you just moved there does not vanish into the collapsed group */
+  var vis=shown(list).filter(function(x){return x!==id});
   dW=dW.filter(function(x){return x!==id});dO=dO.filter(function(x){return x!==id});
   var arr=list==="W"?dW:dO,at;
   if(mv[list].s.length||idx==null||!vis.length)at=arr.length;
@@ -1243,6 +1262,7 @@ document.addEventListener("click",function(e){
   else if(act==="wmove"){if(dW.indexOf(id)>=0)moveDraft(id,"O",null);else moveDraft(id,"W",null)}
   else if(act==="wconfcol")commitWheel(el.getAttribute("data-col"));
   else if(act==="wrevert")revertWheel();
+  else if(act==="woff"){offOpen=!offOpen;renderModal()}
   else if(act==="msclear"){mv[el.getAttribute("data-col")][el.getAttribute("data-key")]=[];renderModal()}
   else if(act==="wresetview"){resetView(el.getAttribute("data-col"));renderModal()}
   else if(act==="spin")spin(ac,id);
