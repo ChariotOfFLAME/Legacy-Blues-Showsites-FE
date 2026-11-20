@@ -225,9 +225,23 @@ li.dim .nm2{color:var(--muted);text-decoration:line-through}
 .mhint{margin:0;padding:10px 18px 0;color:var(--muted);font-size:12px}
 .mcols{align-items:start;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;padding:12px 18px;overflow-y:auto;min-height:0}
 .mcols section{min-width:0}
-.mtools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 34px 34px;gap:6px;margin:0 0 8px;align-items:center}
+.mtools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 34px;gap:6px;margin:0 0 8px;align-items:center}
 .mtools select{min-height:36px;padding:4px 6px;font-size:13px;text-overflow:ellipsis}
 .mtools .ghost{min-height:36px;padding:0;text-align:center}
+.ms{position:relative;min-width:0}
+.ms>summary{list-style:none;cursor:pointer;min-height:36px;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 6px;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.ms>summary::-webkit-details-marker{display:none}
+.ms>summary::after{content:"\25BE";color:var(--muted);flex:none}
+.ms[open]>summary{border-color:var(--accent)}
+.mstxt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.msmenu{position:absolute;z-index:5;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:260px;max-height:240px;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
+.msrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.msrow select{min-height:30px;padding:2px 6px;font-size:12px;flex:none}
+.msidx{display:inline-block;min-width:1em;font-family:var(--font-mono);font-size:11px;color:var(--accent);font-weight:700}
+.mshint{font-size:11px;color:var(--muted);padding:2px 8px}
+.msmenu label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
+.msmenu label:hover{background:var(--surface2)}
+.msmenu .ghost{align-self:flex-start;min-height:30px;padding:4px 8px}
 .mcols h3 span:first-child{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .qtag{font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--accent);white-space:nowrap}
 .mconf{margin-top:8px;width:100%}
@@ -989,11 +1003,12 @@ function showTab(t){
 
 /* ---------- wheel editor (lightbox) ---------- */
 var mAc="a4",dW=[],dO=[],dragId=null,lastFocus=null;
-var mv={W:{r:"",m:"",k:"",d:1},O:{r:"",m:"",k:"",d:1}};
+var SORTS=[["r","Viability",["Ideal first","Ideal last"]],["m","Theater",["A to Z","Z to A"]],["f","Times flown",["Fewest first","Most first"]]];
+var mv={W:{r:[],m:[],s:[],dir:{r:1,m:1,f:1}},O:{r:[],m:[],s:[],dir:{r:1,m:1,f:1}}}; /* s lists the ticked sorts in the order they were ticked, which is their priority */ /* r and m hold the ticked viability and theater values; empty means any */
 /* In this editor the "Not on the wheel" list runs top to bottom in the order sites will be drawn: the top site is next. The saved list keeps its own order (next = last), so it is flipped on the way in and out. */
 function savedO(){return S.ac[mAc].recent.slice().reverse()}
 var RORDER={ideal:0,possible:1,marginal:2,notviable:3,uninspected:4};
-function resetView(c){mv[c]={r:"",m:"",k:"",d:1}}
+function resetView(c){mv[c]={r:[],m:[],s:[],dir:{r:1,m:1,f:1}}}
 function sortKey(id,k){
   var s=site(id);
   if(k==="r")return RORDER[s.rating[mAc]];
@@ -1003,16 +1018,19 @@ function sortKey(id,k){
 /* The order a column would be saved in: the draft order, or the draft sorted when a sort is chosen. Filters never change it. */
 function effective(c){
   var list=(c==="W"?dW:dO).slice(),v=mv[c];
-  if(!v.k)return list;
+  if(!v.s.length)return list;
   var pos={};list.forEach(function(id,i){pos[id]=i});
   list.sort(function(a,b){
-    var r;
-    if(v.k==="m"){
-      var ma=site(a).map?mapLabel(site(a).map):"",mb=site(b).map?mapLabel(site(b).map):"";
-      if(!ma!==!mb)return ma?-1:1; /* sites with no theater always last */
-      r=ma.localeCompare(mb);
-    }else r=sortKey(a,v.k)-sortKey(b,v.k);
-    return (r*v.d)||(pos[a]-pos[b]);
+    for(var i=0;i<v.s.length;i++){
+      var k=v.s[i],r;
+      if(k==="m"){
+        var ma=site(a).map?mapLabel(site(a).map):"",mb=site(b).map?mapLabel(site(b).map):"";
+        if(!ma!==!mb)return ma?-1:1; /* sites with no theater always last */
+        r=ma.localeCompare(mb);
+      }else r=sortKey(a,k)-sortKey(b,k);
+      if(r)return r*v.dir[k];
+    }
+    return pos[a]-pos[b];
   });
   return list;
 }
@@ -1020,8 +1038,8 @@ function visible(c){
   var v=mv[c];
   return effective(c).filter(function(id){
     var s=site(id);
-    if(v.r&&s.rating[mAc]!==v.r)return false;
-    if(v.m&&(v.m==="__none"?!!s.map:s.map!==v.m))return false;
+    if(v.r.length&&v.r.indexOf(s.rating[mAc])<0)return false;
+    if(v.m.length&&v.m.indexOf(s.map||"__none")<0)return false;
     return true;
   });
 }
@@ -1056,15 +1074,30 @@ function mLi(id,list,pos,isNext){
 function renderModal(){
   ["W","O"].forEach(function(c){
     var vis=visible(c),all=(c==="W"?dW:dO),ul=$("m"+c),v=mv[c];
-    var filtered=!!(v.r||v.m);
+    var filtered=!!(v.r.length||v.m.length);
     var order=c==="O"?effective("O"):null,nid=null;
     if(order)for(var oi=0;oi<order.length;oi++){if(eligible(mAc,order[oi])){nid=order[oi];break}}
     ul.innerHTML=vis.length?vis.map(function(id){return mLi(id,c,order?order.indexOf(id)+1:0,id===nid)}).join(""):'<li class="ph">'+(all.length&&filtered?"No sites match these filters":"Drop sites here")+'</li>';
     $("m"+c+"Count").textContent=filtered?vis.length+" of "+all.length+" sites":all.length+" sites";
     var box=document.querySelector('.mtools[data-col="'+c+'"]');
     [].forEach.call(box.querySelectorAll("select[data-mv]"),function(sel){sel.value=v[sel.getAttribute("data-mv")]});
-    box.querySelector('[data-act="wdir"]').innerHTML=v.d>0?"&uarr;":"&darr;";
-    box.querySelector('[data-act="wdir"]').disabled=!v.k;
+    [].forEach.call(box.querySelectorAll("details.ms"),function(ms){
+      var k=ms.getAttribute("data-ms"),on=v[k];
+      [].forEach.call(ms.querySelectorAll("input"),function(cb){cb.checked=on.indexOf(cb.value)>=0});
+      if(k==="s"){
+        [].forEach.call(ms.querySelectorAll(".msrow"),function(row){
+          var key=row.getAttribute("data-key"),i=on.indexOf(key);
+          row.querySelector(".msidx").textContent=i>=0?i+1:"";
+          row.querySelector("select").value=String(v.dir[key]);
+        });
+        var sn=on.map(function(x){var d=SORTS.filter(function(s){return s[0]===x})[0];return d[1]+(v.dir[x]>0?" \u2191":" \u2193")});
+        ms.querySelector(".mstxt").textContent=!sn.length?"No sort":sn.length<=1?sn[0]:sn.length+" sorts";
+        ms.title=sn.join(", ");
+        return;
+      }
+      var names=on.map(function(x){return x==="__none"?"No theater set":k==="r"?LABEL[x]:mapLabel(x)});
+      ms.querySelector(".mstxt").textContent=!names.length?(k==="r"?"Any viability":"Any theater"):names.length<=2?names.join(", "):names.length+" selected";
+    });
   });
   var pw=planChanges("W"),po=planChanges("O"),pa=planChanges("all"),bw=$("mConfW"),bo=$("mConfO");
   var tw=partsW(pw.W).concat(pw.O.moved?["list order"]:[]),to=partsO(po.O).concat(po.W.moved?["wheel order"]:[]);
@@ -1079,13 +1112,13 @@ function renderModal(){
 }
 function dirtyDraft(){
   var A=S.ac[mAc];
-  return A.wheel.join()!==dW.join()||savedO().join()!==dO.join()||!!(mv.W.k||mv.O.k);
+  return A.wheel.join()!==dW.join()||savedO().join()!==dO.join()||!!(mv.W.s.length||mv.O.s.length);
 }
 function modalCol(c,title,tag,what,confirm){
   return '<section><h3><span>'+title+(tag?' <span class="qtag" title="The line runs top to bottom. A site that leaves the wheel joins the bottom. Not Viable and Not inspected sites are skipped.">'+tag+'</span>':'')+'</span> <span class="meta" id="m'+c+'Count"></span></h3>'+
     '<div class="mtools" data-col="'+c+'">'+
-      ["r","m","k"].map(function(k){return '<select data-mv="'+k+'" data-col="'+c+'" aria-label="'+{r:"Filter",m:"Filter",k:"Sort"}[k]+' '+what+' by '+{r:"viability",m:"theater",k:"order"}[k]+'"></select>'}).join("")+
-      '<button type="button" class="ghost" data-act="wdir" data-col="'+c+'" aria-label="Reverse the sort direction" title="Sort direction">&uarr;</button>'+
+      ["r","m"].map(function(k){return '<details class="ms" data-ms="'+k+'" data-col="'+c+'"><summary aria-label="Filter '+what+' by '+{r:"viability",m:"theater"}[k]+'"><span class="mstxt"></span></summary><div class="msmenu"></div></details>'}).join("")+
+      '<details class="ms" data-ms="s" data-col="'+c+'"><summary aria-label="Sort '+what+'"><span class="mstxt"></span></summary><div class="msmenu"></div></details>'+
       '<button type="button" class="ghost" data-act="wresetview" data-col="'+c+'" aria-label="Reset filters and sort" title="Reset filters and sort">&#10005;</button></div>'+
     '<ul class="dl" id="m'+c+'" aria-label="Sites '+what+'"></ul>'+
     '<button type="button" class="btn sm mconf" data-act="wconfcol" data-col="'+c+'" id="mConf'+c+'">'+confirm+'</button></section>';
@@ -1097,14 +1130,18 @@ function buildModal(){
 function fillTools(){
   var maps={},none=0;
   S.sites.forEach(function(s){if(s.map)maps[s.map]=1;else none++});
-  var ratingOpts='<option value="">Any viability</option>'+RATINGS.map(function(r){return '<option value="'+r[0]+'">'+r[1]+'</option>'}).join("");
-  var mapOpts='<option value="">Any theater</option>'+(none?'<option value="__none">No theater set</option>':'')+Object.keys(maps).sort().map(function(m){return '<option value="'+esc(m)+'">'+esc(mapLabel(m))+'</option>'}).join("");
-  var sortOpts='<option value="">No sort</option><option value="r">By viability</option><option value="m">By theater</option><option value="f">By flown</option>';
+  function checks(c,k,items){
+    return items.map(function(it){return '<label><input type="checkbox" data-mv="'+k+'" data-col="'+c+'" value="'+esc(it[0])+'"> '+esc(it[1])+'</label>'}).join("")+
+      '<button type="button" class="ghost sm" data-act="msclear" data-col="'+c+'" data-key="'+k+'">Clear</button>';
+  }
+  var ratingItems=RATINGS.map(function(r){return [r[0],r[1]]});
+  var mapItems=(none?[["__none","No theater set"]]:[]).concat(Object.keys(maps).sort().map(function(m){return [m,mapLabel(m)]}));
+  var sortRows=SORTS.map(function(s){return '<div class="msrow" data-key="'+s[0]+'"><label><input type="checkbox" data-mv="s" data-col="CC" value="'+s[0]+'"> '+s[1]+' <span class="msidx" title="Sort priority"></span></label><select data-mvd="'+s[0]+'" data-col="CC" aria-label="'+s[1]+' direction"><option value="1">'+s[2][0]+'</option><option value="-1">'+s[2][1]+'</option></select></div>'}).join("")+'<div class="mshint">Sorts apply in the order you tick them.</div><button type="button" class="ghost sm" data-act="msclear" data-col="CC" data-key="s">Clear</button>';
   ["W","O"].forEach(function(c){
     var box=document.querySelector('.mtools[data-col="'+c+'"]');
-    box.querySelector('[data-mv="r"]').innerHTML=ratingOpts;
-    box.querySelector('[data-mv="m"]').innerHTML=mapOpts;
-    box.querySelector('[data-mv="k"]').innerHTML=sortOpts;
+    box.querySelector('[data-ms="r"] .msmenu').innerHTML=checks(c,"r",ratingItems);
+    box.querySelector('[data-ms="m"] .msmenu').innerHTML=checks(c,"m",mapItems);
+    box.querySelector('[data-ms="s"] .msmenu').innerHTML=sortRows.replace(/CC/g,c);
   });
 }
 function openWheel(ac){
@@ -1125,7 +1162,7 @@ function moveDraft(id,list,idx){
   var vis=visible(list).filter(function(x){return x!==id});
   dW=dW.filter(function(x){return x!==id});dO=dO.filter(function(x){return x!==id});
   var arr=list==="W"?dW:dO,at;
-  if(mv[list].k||idx==null||!vis.length)at=arr.length;
+  if(mv[list].s.length||idx==null||!vis.length)at=arr.length;
   else if(idx<vis.length)at=arr.indexOf(vis[idx]);
   else at=arr.indexOf(vis[vis.length-1])+1;
   if(at<0||at>arr.length)at=arr.length;
@@ -1173,7 +1210,7 @@ document.addEventListener("drop",function(e){
 $("wheelModal").addEventListener("mousedown",function(e){if(e.target.id==="wheelModal")closeWheel()});
 document.addEventListener("keydown",function(e){
   var m=$("wheelModal");if(m.hidden)return;
-  if(e.key==="Escape"){e.preventDefault();closeWheel();return}
+  if(e.key==="Escape"){e.preventDefault();var op=m.querySelector("details.ms[open]");if(op){op.removeAttribute("open");op.querySelector("summary").focus()}else closeWheel();return}
   if(e.key==="Tab"){
     var f=[].slice.call(m.querySelectorAll("button:not([disabled])"));if(!f.length)return;
     var first=f[0],last=f[f.length-1],a=document.activeElement;
@@ -1205,7 +1242,7 @@ document.addEventListener("click",function(e){
   else if(act==="wmove"){if(dW.indexOf(id)>=0)moveDraft(id,"O",null);else moveDraft(id,"W",null)}
   else if(act==="wconfcol")commitWheel(el.getAttribute("data-col"));
   else if(act==="wrevert")revertWheel();
-  else if(act==="wdir"){var dc=el.getAttribute("data-col");mv[dc].d=-mv[dc].d;renderModal()}
+  else if(act==="msclear"){mv[el.getAttribute("data-col")][el.getAttribute("data-key")]=[];renderModal()}
   else if(act==="wresetview"){resetView(el.getAttribute("data-col"));renderModal()}
   else if(act==="spin")spin(ac,id);
   else if(act==="undo")undo(ac);
@@ -1233,9 +1270,18 @@ document.addEventListener("click",function(e){
     inp.addEventListener("blur",function(){commit(true)});
   }
 });
+document.addEventListener("click",function(e){
+  var o=document.querySelectorAll("#wheelModal details.ms[open]");
+  for(var i=0;i<o.length;i++)if(!o[i].contains(e.target))o[i].removeAttribute("open");
+});
 document.addEventListener("change",function(e){
   var t=e.target;
-  if(t&&t.getAttribute&&t.getAttribute("data-mv")){var c=t.getAttribute("data-col");mv[c][t.getAttribute("data-mv")]=t.value;renderModal();return}
+  if(t&&t.getAttribute&&t.getAttribute("data-mv")){
+    var c=t.getAttribute("data-col"),k=t.getAttribute("data-mv");
+    if(t.type==="checkbox"){var at=mv[c][k].indexOf(t.value);if(t.checked&&at<0)mv[c][k].push(t.value);else if(!t.checked&&at>=0)mv[c][k].splice(at,1)}
+    renderModal();return;
+  }
+  if(t&&t.getAttribute&&t.getAttribute("data-mvd")){mv[t.getAttribute("data-col")].dir[t.getAttribute("data-mvd")]=Number(t.value);renderModal();return}
   var el=e.target,act=el.getAttribute&&el.getAttribute("data-act");
   if(el.id==="filterMap"){filterMap=el.value;renderRows();return}
   if(!act)return;
