@@ -652,7 +652,7 @@ function buildCsv(){
     var r=[s.name,mapLabel(s.map||""),s.fav?"Yes":"No",s.photo?"Yes":"No"];
     AIR.forEach(function(p){
       var A=S.ac[p[0]],w=A.wheel.indexOf(s.id),o=A.recent.indexOf(s.id);
-      r.push(LABEL[s.rating[p[0]]],s.flights[p[0]],w>=0?"On the wheel":"Done recently",w>=0?w+1:o+1);
+      r.push(LABEL[s.rating[p[0]]],s.flights[p[0]],w>=0?"On the wheel":"Done recently",w>=0?w+1:A.recent.length-o);
     });
     r.push(briefText(s),s.notes||"");
     rows.push(r);
@@ -786,7 +786,7 @@ function fillList(ac,key,ids,opts,empty){
 }
 function renderSpinner(ac){
   var A=S.ac[ac];
-  var rot=A.recent.filter(function(id){return eligible(ac,id)}),off=A.recent.filter(function(id){return !eligible(ac,id)}),nx=nextUpId(ac);
+  var q=A.recent.slice().reverse(),rot=q.filter(function(id){return eligible(ac,id)}),off=q.filter(function(id){return !eligible(ac,id)}),nx=nextUpId(ac);
   $(ac+"-wheelMeta").textContent=A.wheel.length+" of "+A.wheelSize+" slots filled";
   $(ac+"-recentMeta").textContent=rot.length+" sites";
   $(ac+"-offMeta").textContent=off.length;
@@ -852,12 +852,12 @@ function paneHtml(ac,label){
       '<input type="number" id="'+ac+'-wheelSize" data-act="wsize" data-ac="'+ac+'" min="1" value="12" style="width:84px;font-family:var(--font-mono)">'+
       '<button class="btn primary" data-act="openwheel" data-ac="'+ac+'">Edit wheel</button>'+
       '<button class="btn" data-act="undo" data-ac="'+ac+'" id="'+ac+'-undoBtn" disabled>Undo last change</button>'+
-      '<button class="btn" data-act="reverse" data-ac="'+ac+'" title="Flip the order of the recent list, so its top becomes its bottom">Reverse recent order</button>'+
+      '<button class="btn" data-act="reverse" data-ac="'+ac+'" title="Flip the order of the recent list, so its top becomes its bottom and a different site is next">Reverse recent order</button>'+
       '<button class="btn" data-act="copy" data-which="all" data-ac="'+ac+'" style="margin-left:auto">Copy all sites</button>'+
     '</div>'+
     '<div class="cols">'+
-      listPanel(ac,"wheel","Showsites on the wheel","Click a site after you fly it. It moves to the top of the recent list and its count goes up by 1.")+
-      listPanel(ac,"recent","Showsites we\'ve done recently","Newest at the top. The site at the bottom moves onto the wheel next. Click a number to edit it.",
+      listPanel(ac,"wheel","Showsites on the wheel","Click a site after you fly it. It joins the bottom of the recent list and its count goes up by 1.")+
+      listPanel(ac,"recent","Showsites we\'ve done recently","<b>&#9650; The top site moves onto the wheel next.</b> Sites you just flew join the bottom. Click a number to edit it.",
         '<details class="offbox"><summary>Not available for the wheel <span class="meta">(<span id="'+ac+'-offMeta">0</span>)</span></summary>'+
           listBody(ac,"off","Not Viable and Not inspected sites wait here and are never moved onto the wheel automatically. Rate a site Ideal, Flyable or Marginal on the Working tab to bring it back into the recent list.")+
           '<div style="padding:8px 14px">'+copyBtn(ac,"off")+'</div></details>')+
@@ -1216,7 +1216,7 @@ document.addEventListener("click",function(e){
   else if(act==="closeexport")$("exportBox").hidden=true;
   else if(act==="copycsv"){var ta=$("exportText");ta.select();copyText(ta.value,"CSV copied")}
   else if(act==="copy"){
-    var A=S.ac[ac],w=el.getAttribute("data-which"),ids=w==="wheel"?A.wheel:w==="recent"?A.recent.filter(function(x){return eligible(ac,x)}):w==="off"?A.recent.filter(function(x){return !eligible(ac,x)}):A.wheel.concat(A.recent);
+    var A=S.ac[ac],w=el.getAttribute("data-which"),q=A.recent.slice().reverse(),ids=w==="wheel"?A.wheel:w==="recent"?q.filter(function(x){return eligible(ac,x)}):w==="off"?q.filter(function(x){return !eligible(ac,x)}):A.wheel.concat(q);
     copyText(names(ids).join("\n"),"Copied "+ids.length+" "+AC_LABEL[ac]+" site"+(ids.length===1?"":"s"));
   }
   else if(act==="del"){
