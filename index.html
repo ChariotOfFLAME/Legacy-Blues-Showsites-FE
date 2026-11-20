@@ -108,6 +108,9 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .nowgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:20px;align-items:start}
 .imgph{aspect-ratio:16/10;max-width:100%;border:2px dashed var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);text-align:center;padding:16px}
 .imgph svg{width:64px;height:64px}
+.offbox{border-top:1px solid var(--line);margin-top:8px}
+.offbox>summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:revert}
+.offbox .meta{font-weight:400}
 .imgph b{color:var(--ink)}
 .nowbrief{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:20px;min-width:0}
 .bk{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
@@ -538,7 +541,8 @@ function undo(ac){
 }
 
 /* ---------- wheel logic ---------- */
-function eligible(ac,id){var s=site(id);return !!s&&s.rating[ac]!=="notviable"}
+/* Only sites rated Ideal, Flyable or Marginal are drawn back onto the wheel automatically. Not Viable and Not inspected sites wait in the collapsed list under Recent. */
+function eligible(ac,id){var s=site(id);return !!s&&s.rating[ac]!=="notviable"&&s.rating[ac]!=="uninspected"}
 function refill(ac,excl){
   var A=S.ac[ac];excl=excl||[];
   while(A.wheel.length<A.wheelSize){
@@ -767,16 +771,19 @@ function liHtml(ac,id,opts){
   var main=opts.click
     ? '<button class="site" data-act="spin" data-ac="'+ac+'" data-id="'+id+'">'+nm2(s)+pill(rt)+'</button>'
     : '<div class="site">'+nm2(s)+(opts.next?'<span class="next">Next on wheel</span>':'')+pill(rt)+'</div>';
-  return '<li'+(rt==="notviable"&&!opts.click?' class="dim"':'')+'>'+main+
+  return '<li'+((rt==="notviable"||opts.dim)&&!opts.click?' class="dim"':'')+'>'+main+
     '<button class="count" data-act="editcount" data-ac="'+ac+'" data-id="'+id+'" aria-label="Times flown at '+esc(s.name)+': '+fl+'. Click to edit.">'+fl+'</button></li>';
 }
 function renderSpinner(ac){
   var A=S.ac[ac];
   $(ac+"-wheelMeta").textContent=A.wheel.length+" of "+A.wheelSize+" slots filled";
-  $(ac+"-recentMeta").textContent=A.recent.length+" sites";
+  var rot=A.recent.filter(function(id){return eligible(ac,id)}),off=A.recent.filter(function(id){return !eligible(ac,id)});
+  $(ac+"-recentMeta").textContent=rot.length+" sites";
+  $(ac+"-offMeta").textContent=off.length;
+  $(ac+"-offList").innerHTML=off.length?off.map(function(id){return liHtml(ac,id,{click:false,dim:true})}).join(""):'<li class="empty" style="display:block;width:100%">None. Every site is rated and available.</li>';
   $(ac+"-wheelList").innerHTML=A.wheel.length?A.wheel.map(function(id){return liHtml(ac,id,{click:true})}).join(""):'<li class="empty" style="display:block;width:100%">The wheel is empty. Raise the number of sites on the wheel or mark sites as viable.</li>';
   var nx=nextUpId(ac);
-  $(ac+"-recentList").innerHTML=A.recent.length?A.recent.map(function(id){return liHtml(ac,id,{click:false,next:id===nx})}).join(""):'<li class="empty" style="display:block;width:100%">Nothing here yet.</li>';
+  $(ac+"-recentList").innerHTML=rot.length?rot.map(function(id){return liHtml(ac,id,{click:false,next:id===nx})}).join(""):'<li class="empty" style="display:block;width:100%">Nothing here yet.</li>';
   var ws=$(ac+"-wheelSize");
   if(document.activeElement!==ws)ws.value=A.wheelSize;
   ws.max=S.sites.length;
@@ -844,7 +851,13 @@ function paneHtml(ac,label){
         '<button class="btn sm" data-act="copy" data-which="recent" data-ac="'+ac+'">Copy list</button></header>'+
         '<div class="hint">Newest at the top. The site at the bottom moves onto the wheel next. Click a number to edit it.</div>'+
         '<div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div>'+
-        '<ul class="sites" id="'+ac+'-recentList"></ul></div>'+
+        '<ul class="sites" id="'+ac+'-recentList"></ul>'+
+        '<details class="offbox"><summary>Not available for the wheel <span class="meta">(<span id="'+ac+'-offMeta">0</span>)</span></summary>'+
+          '<div class="hint">Not Viable and Not inspected sites wait here and are never moved onto the wheel automatically. Rate a site Ideal, Flyable or Marginal on the Working tab to bring it back into the recent list.</div>'+
+          '<div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div>'+
+          '<ul class="sites" id="'+ac+'-offList"></ul>'+
+          '<div style="padding:8px 14px"><button class="btn sm" data-act="copy" data-which="off" data-ac="'+ac+'">Copy list</button></div>'+
+        '</details></div>'+
     '</div></section>';
 }
 
@@ -1080,7 +1093,7 @@ document.addEventListener("click",function(e){
   else if(act==="closeexport")$("exportBox").hidden=true;
   else if(act==="copycsv"){var ta=$("exportText");ta.select();copyText(ta.value,"CSV copied")}
   else if(act==="copy"){
-    var A=S.ac[ac],w=el.getAttribute("data-which"),ids=w==="wheel"?A.wheel:w==="recent"?A.recent:A.wheel.concat(A.recent);
+    var A=S.ac[ac],w=el.getAttribute("data-which"),ids=w==="wheel"?A.wheel:w==="recent"?A.recent.filter(function(x){return eligible(ac,x)}):w==="off"?A.recent.filter(function(x){return !eligible(ac,x)}):A.wheel.concat(A.recent);
     copyText(names(ids).join("\n"),"Copied "+ids.length+" "+AC_LABEL[ac]+" site"+(ids.length===1?"":"s"));
   }
   else if(act==="del"){
