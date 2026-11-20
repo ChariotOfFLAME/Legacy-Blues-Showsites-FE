@@ -314,8 +314,7 @@ ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
         <thead><tr>
           <th scope="col">Show site</th>
           <th scope="col">Theater</th>
-          <th scope="col">A4 ranking</th><th scope="col">F18 ranking</th>
-          <th scope="col">A4 flown</th><th scope="col">F18 flown</th>
+          <th scope="col" id="thAc"></th>
           <th scope="col">On the wheel</th>
           <th scope="col"><span style="position:absolute;left:-9999px">Actions</span></th>
         </tr></thead>
@@ -337,17 +336,7 @@ ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
       <button class="ghost" data-act="wclose">Close</button>
     </header>
     <p class="mhint">Drag sites between the lists, or use the button on each row. Filters and sorting only change what you see here, so they never move a site, and a site you move stays moved when you clear them. Sorting a list and confirming it saves that order, and the site at the top of "Not on the wheel" is the next to move onto the wheel after a spin. Not Viable sites can't go on the wheel. Each column has its own Confirm button, which saves that column as it looks now. Confirm all saves both, and Revert goes back to what is saved.</p>
-    <div class="mcols">
-      <section><h3>On the wheel <span class="meta" id="mWCount"></span></h3>
-        <div class="mtools" data-col="W"><select data-mv="r" data-col="W" aria-label="Filter the wheel by viability"></select><select data-mv="m" data-col="W" aria-label="Filter the wheel by theater"></select><select data-mv="k" data-col="W" aria-label="Sort the wheel by"></select><button type="button" class="ghost" data-act="wdir" data-col="W" aria-label="Reverse the sort direction">&uarr;</button><button type="button" class="ghost" data-act="wresetview" data-col="W">Reset view</button></div>
-        <ul class="dl" id="mW" aria-label="Sites on the wheel"></ul>
-        <button type="button" class="btn sm mconf" data-act="wconfcol" data-col="W" id="mConfW">Confirm wheel</button></section>
-      <section><h3>Not on the wheel <span class="meta" id="mOCount"></span></h3>
-        <p class="qhint"><b>&#9650; The top site is next</b> onto the wheel after a spin. The line runs top to bottom, and a site that leaves the wheel joins the bottom. Not Viable and Not inspected sites are skipped.</p>
-        <div class="mtools" data-col="O"><select data-mv="r" data-col="O" aria-label="Filter the other sites by viability"></select><select data-mv="m" data-col="O" aria-label="Filter the other sites by theater"></select><select data-mv="k" data-col="O" aria-label="Sort the other sites by"></select><button type="button" class="ghost" data-act="wdir" data-col="O" aria-label="Reverse the sort direction">&uarr;</button><button type="button" class="ghost" data-act="wresetview" data-col="O">Reset view</button></div>
-        <ul class="dl" id="mO" aria-label="Sites not on the wheel"></ul>
-        <button type="button" class="btn sm mconf" data-act="wconfcol" data-col="O" id="mConfO">Confirm list</button></section>
-    </div>
+    <div class="mcols" id="mCols"></div>
     <footer>
       <span class="note" id="mNote"></span>
       <button class="btn" data-act="wrevert" id="mRevert" disabled>Revert to saved</button>
@@ -791,16 +780,19 @@ function liHtml(ac,id,opts){
   return '<li'+((rt==="notviable"||opts.dim)&&!opts.click?' class="dim"':'')+'>'+main+
     '<button class="count" data-act="editcount" data-ac="'+ac+'" data-id="'+id+'" aria-label="Times flown at '+esc(s.name)+': '+fl+'. Click to edit.">'+fl+'</button></li>';
 }
+/* shared by every list on the spinner feeds */
+function fillList(ac,key,ids,opts,empty){
+  $(ac+"-"+key+"List").innerHTML=ids.length?ids.map(function(id){return liHtml(ac,id,typeof opts==="function"?opts(id):opts)}).join(""):'<li class="empty" style="display:block;width:100%">'+empty+'</li>';
+}
 function renderSpinner(ac){
   var A=S.ac[ac];
+  var rot=A.recent.filter(function(id){return eligible(ac,id)}),off=A.recent.filter(function(id){return !eligible(ac,id)}),nx=nextUpId(ac);
   $(ac+"-wheelMeta").textContent=A.wheel.length+" of "+A.wheelSize+" slots filled";
-  var rot=A.recent.filter(function(id){return eligible(ac,id)}),off=A.recent.filter(function(id){return !eligible(ac,id)});
   $(ac+"-recentMeta").textContent=rot.length+" sites";
   $(ac+"-offMeta").textContent=off.length;
-  $(ac+"-offList").innerHTML=off.length?off.map(function(id){return liHtml(ac,id,{click:false,dim:true})}).join(""):'<li class="empty" style="display:block;width:100%">None. Every site is rated and available.</li>';
-  $(ac+"-wheelList").innerHTML=A.wheel.length?A.wheel.map(function(id){return liHtml(ac,id,{click:true})}).join(""):'<li class="empty" style="display:block;width:100%">The wheel is empty. Raise the number of sites on the wheel or mark sites as viable.</li>';
-  var nx=nextUpId(ac);
-  $(ac+"-recentList").innerHTML=rot.length?rot.map(function(id){return liHtml(ac,id,{click:false,next:id===nx})}).join(""):'<li class="empty" style="display:block;width:100%">Nothing here yet.</li>';
+  fillList(ac,"wheel",A.wheel,{click:true},"The wheel is empty. Raise the number of sites on the wheel or mark sites as viable.");
+  fillList(ac,"recent",rot,function(id){return {click:false,next:id===nx}},"Nothing here yet.");
+  fillList(ac,"off",off,{click:false,dim:true},"None. Every site is rated and available.");
   var ws=$(ac+"-wheelSize");
   if(document.activeElement!==ws)ws.value=A.wheelSize;
   ws.max=S.sites.length;
@@ -847,6 +839,11 @@ function renderNow(){
     '<div class="nowbrief">'+brief+'</div></div></div>';
 }
 
+function copyBtn(ac,which){return '<button class="btn sm" data-act="copy" data-which="'+which+'" data-ac="'+ac+'">Copy list</button>'}
+function listBody(ac,key,hint){return '<div class="hint">'+hint+'</div><div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div><ul class="sites" id="'+ac+'-'+key+'List"></ul>'}
+function listPanel(ac,key,title,hint,extra){
+  return '<div class="panel"><header><div><h2>'+title+'</h2><span class="meta" id="'+ac+'-'+key+'Meta"></span></div>'+copyBtn(ac,key)+'</header>'+listBody(ac,key,hint)+(extra||"")+'</div>';
+}
 function paneHtml(ac,label){
   return '<section id="pane-'+ac+'" class="pane" role="tabpanel" aria-labelledby="tab-'+ac+'" hidden>'+
     '<h2 class="paneh">'+label+' spinner feed</h2>'+
@@ -859,25 +856,13 @@ function paneHtml(ac,label){
       '<button class="btn" data-act="copy" data-which="all" data-ac="'+ac+'" style="margin-left:auto">Copy all sites</button>'+
     '</div>'+
     '<div class="cols">'+
-      '<div class="panel"><header><div><h2>Showsites on the wheel</h2><span class="meta" id="'+ac+'-wheelMeta"></span></div>'+
-        '<button class="btn sm" data-act="copy" data-which="wheel" data-ac="'+ac+'">Copy list</button></header>'+
-        '<div class="hint">Click a site after you fly it. It moves to the top of the recent list and its count goes up by 1.</div>'+
-        '<div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div>'+
-        '<ul class="sites" id="'+ac+'-wheelList"></ul></div>'+
-      '<div class="panel"><header><div><h2>Showsites we\'ve done recently</h2><span class="meta" id="'+ac+'-recentMeta"></span></div>'+
-        '<button class="btn sm" data-act="copy" data-which="recent" data-ac="'+ac+'">Copy list</button></header>'+
-        '<div class="hint">Newest at the top. The site at the bottom moves onto the wheel next. Click a number to edit it.</div>'+
-        '<div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div>'+
-        '<ul class="sites" id="'+ac+'-recentList"></ul>'+
+      listPanel(ac,"wheel","Showsites on the wheel","Click a site after you fly it. It moves to the top of the recent list and its count goes up by 1.")+
+      listPanel(ac,"recent","Showsites we\'ve done recently","Newest at the top. The site at the bottom moves onto the wheel next. Click a number to edit it.",
         '<details class="offbox"><summary>Not available for the wheel <span class="meta">(<span id="'+ac+'-offMeta">0</span>)</span></summary>'+
-          '<div class="hint">Not Viable and Not inspected sites wait here and are never moved onto the wheel automatically. Rate a site Ideal, Flyable or Marginal on the Working tab to bring it back into the recent list.</div>'+
-          '<div class="listhead"><span>Site</span><span style="margin-right:14px">Flown</span></div>'+
-          '<ul class="sites" id="'+ac+'-offList"></ul>'+
-          '<div style="padding:8px 14px"><button class="btn sm" data-act="copy" data-which="off" data-ac="'+ac+'">Copy list</button></div>'+
-        '</details></div>'+
+          listBody(ac,"off","Not Viable and Not inspected sites wait here and are never moved onto the wheel automatically. Rate a site Ideal, Flyable or Marginal on the Working tab to bring it back into the recent list.")+
+          '<div style="padding:8px 14px">'+copyBtn(ac,"off")+'</div></details>')+
     '</div></section>';
 }
-
 /* ---------- persistence: Google Apps Script backend, with a browser copy as a fallback ---------- */
 var CONFIG={ENDPOINT:"https://script.google.com/macros/s/AKfycbyXFcjrshTYy60v00YpBk9CvKXea5YEE3j6GcXVNk14EjmL0bZQnf5vlp9BjgN8ntef1A/exec"}; /* the Web app URL from Apps Script (ends in /exec) */
 var LS_STATE="showSiteRotation.v1",LS_PASS="showSiteRotation.pass";
@@ -962,7 +947,8 @@ function initTheme(){
 }
 
 function init(){
-  initTheme();
+  initTheme();buildModal();
+  $("thAc").outerHTML=AIR.map(function(p){return '<th scope="col">'+p[1]+' ranking</th>'}).join("")+AIR.map(function(p){return '<th scope="col">'+p[1]+' flown</th>'}).join("");
   $("spinnerPanes").innerHTML=AIR.map(function(p){return paneHtml(p[0],p[1])}).join("");
   $("newSlot").innerHTML=mapSelect("mapsel",'id="newMap" aria-label="Theater for the new site"',"")+
     AIR.map(function(p){return '<label class="mini"><span>'+p[1]+'</span>'+rateSelect('id="newRating-'+p[0]+'" data-act="newrate" aria-label="'+p[1]+' ranking for the new site"',"uninspected")+'</label>'}).join("");
@@ -1094,6 +1080,19 @@ function renderModal(){
 function dirtyDraft(){
   var A=S.ac[mAc];
   return A.wheel.join()!==dW.join()||savedO().join()!==dO.join()||!!(mv.W.k||mv.O.k);
+}
+function modalCol(c,title,hint,what,confirm){
+  return '<section><h3>'+title+' <span class="meta" id="m'+c+'Count"></span></h3>'+(hint?'<p class="qhint">'+hint+'</p>':'')+
+    '<div class="mtools" data-col="'+c+'">'+
+      ["r","m","k"].map(function(k){return '<select data-mv="'+k+'" data-col="'+c+'" aria-label="'+{r:"Filter",m:"Filter",k:"Sort"}[k]+' '+what+' by '+{r:"viability",m:"theater",k:"order"}[k]+'"></select>'}).join("")+
+      '<button type="button" class="ghost" data-act="wdir" data-col="'+c+'" aria-label="Reverse the sort direction">&uarr;</button>'+
+      '<button type="button" class="ghost" data-act="wresetview" data-col="'+c+'">Reset view</button></div>'+
+    '<ul class="dl" id="m'+c+'" aria-label="Sites '+what+'"></ul>'+
+    '<button type="button" class="btn sm mconf" data-act="wconfcol" data-col="'+c+'" id="mConf'+c+'">'+confirm+'</button></section>';
+}
+function buildModal(){
+  $("mCols").innerHTML=modalCol("W","On the wheel","","on the wheel","Confirm wheel")+
+    modalCol("O","Not on the wheel",'<b>&#9650; The top site is next</b> onto the wheel after a spin. The line runs top to bottom, and a site that leaves the wheel joins the bottom. Not Viable and Not inspected sites are skipped.',"not on the wheel","Confirm list");
 }
 function fillTools(){
   var maps={},none=0;
