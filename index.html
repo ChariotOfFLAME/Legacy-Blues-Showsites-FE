@@ -897,14 +897,25 @@ function wrap2(words,p,n){
   return [l1.join(" "),words.slice(i).join(" ")];
 }
 function lineOk(l,p,n){return fitW(cardLine(p,n,0,l[0]))<=1&&fitW(cardLine(p,n,1,l[1]))<=1}
+/* the first clause only, with anything in brackets dropped: "X, parallel Y on left (note)" -> "X" */
+function clause(raw){return String(raw||"").replace(/\([^)]*\)/g," ").split(/[,;]/)[0]}
+/* words that add little on a card */
+function lowInfo(t){
+  return t.replace(/\bPARALLEL( TO| WITH)?\b/g,"PARA").replace(/\b(JUST|YOUR|THERE|ALSO|APPROX(IMATELY)?)\b/g," ")
+    .replace(/\bRIGHT (?=(BEFORE|OVER|AFTER|AT|ON|IN|BETWEEN|NEXT)\b)/g," ").replace(/\bON (THE )?(L|R|LEFT|RIGHT)$/g," ")
+    .replace(/\s+/g," ").trim();
+}
 function draftLines(raw,p,n){
-  var t=norm(raw);
-  if(!t)return {l:["",""],cut:false};
-  var nf=function(x){return x.replace(FILLER,"").replace(/\s+/g," ").trim()},stages=[t,nf(t),nf(abbr(t))],r;
+  var full=norm(raw);
+  if(!full)return {l:["",""],cut:false};
+  var nf=function(x){return x.replace(FILLER,"").replace(/\s+/g," ").trim()},c=norm(clause(raw));
+  var stages=[full,c,nf(c),nf(abbr(c)),nf(lowInfo(abbr(c))),nf(lowInfo(abbr(full)))],r;
   for(var i=0;i<stages.length;i++){
+    if(!stages[i])continue;
     r=wrap2(stages[i].split(" ").filter(Boolean),p,n);
     if(lineOk(r,p,n))return {l:r,cut:false};
   }
+  r=wrap2(stages[4].split(" ").filter(Boolean),p,n);
   var w=r[1].split(" ").filter(Boolean);
   while(w.length&&fitW(w.join(" "))>1)w.pop();
   r[1]=w.join(" ");
