@@ -943,10 +943,14 @@ function drawCard(cv,s){
   ctx.font='700 '+Math.round(px*1.05)+'px '+CARDFONT;
   ctx.textAlign="left";ctx.fillText("CL",M+pad,M+px*1.05);
   ctx.textAlign="right";ctx.fillText("CR",W-M-pad,M+px*1.05);
-  ctx.font='600 '+Math.round(px*.52)+'px '+CARDFONT;ctx.textAlign="center";
-  var nm=s.name.toUpperCase();
-  while(nm.length>3&&ctx.measureText(nm).width>W-2*M-2*cw*.55&&nm.length>3)nm=nm.slice(0,-1);
-  ctx.fillStyle="#555";ctx.fillText(nm,W/2,M+px*1.05);
+  /* field name: big, black and bold; shrinks to fit between CL and CR, then truncates */
+  ctx.font='700 '+Math.round(px*1.05)+'px '+CARDFONT;
+  var lab=Math.max(ctx.measureText("CL").width,ctx.measureText("CR").width),avail=W-2*M-2*pad-2*lab-2*28;
+  var nm=s.name.toUpperCase(),fs=Math.round(px*.95),minfs=Math.round(px*.6);
+  ctx.font='700 '+fs+'px '+CARDFONT;
+  while(fs>minfs&&ctx.measureText(nm).width>avail){fs-=2;ctx.font='700 '+fs+'px '+CARDFONT}
+  while(nm.length>3&&ctx.measureText(nm).width>avail)nm=nm.slice(0,-1);
+  ctx.textAlign="center";ctx.fillStyle="#111";ctx.fillText(nm,W/2,M+px*1.05);
   var y0=M+CARD.HEAD,rh=(H-M-y0)/4;
   ctx.strokeStyle="#111";ctx.lineWidth=4;ctx.fillStyle="#111";ctx.font=f;
   [4,3,2,1].forEach(function(n,i){
