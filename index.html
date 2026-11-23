@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Show Site Rotation</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@600;700&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
 :root{color-scheme:light}
 body{margin:0}
@@ -83,8 +83,26 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .crcl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
 .brief fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px;margin:0;min-width:0;display:flex;flex-direction:column;gap:6px}
 .brief legend{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0 6px}
-.brief .mrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
+.brief .mrow{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
 .brief .mrow>span:first-child{font-family:var(--font-mono);font-weight:600;width:28px;flex:none;color:var(--muted)}
+.cardsec{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.cf{position:relative;flex:1;min-width:110px}
+.cf .bin{padding-right:46px;text-transform:uppercase}
+.cf .bin.over{border-color:var(--notviable)}
+.cnt{position:absolute;right:8px;top:50%;transform:translateY(-50%);font:600 11px var(--font-mono);color:var(--muted);font-style:normal;pointer-events:none}
+.cnt.over{color:var(--notviable)}
+.cerr,.kneeerr{color:var(--notviable);background:var(--notviable-bg);border-radius:8px;padding:8px 10px;font-size:13px}
+.cerr[hidden]{display:none}
+.kneeblk{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.kneeout{display:flex;flex-direction:column;gap:8px;align-items:flex-start;max-width:100%}
+.kneeout:empty{display:none}
+canvas.cardcv{width:min(100%,420px);height:auto;aspect-ratio:124/172;border:1px solid var(--line);border-radius:6px;background:#fff}
+img[data-zoom]{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:80;background:rgba(5,8,16,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));cursor:zoom-out}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:100%;max-height:calc(100% - 44px);object-fit:contain;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:default}
+.lbcap{color:#E7ECF6;font-size:14px;text-align:center}
+.lbx{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.5);color:#fff;font-size:28px;line-height:1;cursor:pointer}
 .imgrow{display:flex;gap:12px;align-items:center}
 .imgthumb{width:72px;height:48px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
 .imgthumb svg{width:24px;height:24px}
@@ -111,7 +129,9 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .offbox{border-top:1px solid var(--line);margin-top:8px}
 .offbox>summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:revert}
 .offbox .meta{font-weight:400}
-.mrow .mimgbtn{white-space:nowrap}
+.mrow .mimgbtn{white-space:nowrap;flex:none}
+.brief .mrow>.bin{flex:1;width:auto}
+.brief .mrow .cf{min-width:70px}
 .rungimg{margin:-2px 12px 8px 12px}
 .rungimg>summary{cursor:pointer;font-size:12px;color:var(--accent);padding:2px 0}
 .rungimg img{display:block;max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);margin-top:6px}
@@ -370,6 +390,7 @@ ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
     </footer>
   </div>
 </div>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image preview" hidden><button type="button" class="lbx" id="lbClose" aria-label="Close preview">&times;</button><img id="lbImg" alt=""><div class="lbcap" id="lbCap"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -383,8 +404,9 @@ var LABEL={};RATINGS.forEach(function(r){LABEL[r[0]]=r[1]});
 /*BRIEF-START*/
 /* Per-site briefing form: CP (description @ coordinates), obstructions, crowd right/left at 4-1 miles. */
 var BKEYS=["cpDesc","cpCoords","obs","cr4","cr3","cr2","cr1","cl4","cl3","cl2","cl1"];
-function blankBrief(){var b={};BKEYS.forEach(function(k){b[k]=""});return b}
-function cleanBrief(x){var b=blankBrief();x=x||{};BKEYS.forEach(function(k){b[k]=String(x[k]||"").slice(0,k==="obs"?2000:400)});return b}
+var CKEYS=[];["cl","cr"].forEach(function(p){[4,3,2,1].forEach(function(n){CKEYS.push("k"+p+n+"a","k"+p+n+"b","g"+p+n)})});
+function blankBrief(){var b={};BKEYS.concat(CKEYS).forEach(function(k){b[k]=""});return b}
+function cleanBrief(x){var b=blankBrief();x=x||{};BKEYS.concat(CKEYS).forEach(function(k){b[k]=String(x[k]||"").slice(0,k==="obs"?2000:/^k/.test(k)?16:/^g/.test(k)?40:400)});return b}
 var MSLOTS=[];["cr","cl"].forEach(function(p){[4,3,2,1].forEach(function(n){MSLOTS.push(p+n)})});
 function cleanMimg(x){var o={};x=x||{};MSLOTS.forEach(function(k){var v=String(x[k]||"");o[k]=/^images\/[A-Za-z0-9._-]{1,100}$/.test(v)?v:""});return o}
 function hasBrief(s){var b=s.brief||{};return !!(s.notes||BKEYS.some(function(k){return b[k]}))}
@@ -764,14 +786,14 @@ function notesRow(s){
   var id=s.id;
   return '<tr class="notesrow"><td colspan="8"><div class="brief">'+
     '<div class="brhead"><b>Briefing for '+esc(s.name)+'</b><button type="button" class="btn sm" data-act="copybrief" data-id="'+id+'">Copy as text</button></div>'+
-    '<div class="imgrow"><div class="imgthumb">'+(s.img?'<img src="'+esc(imgSrc(s.img))+'" alt="" onerror="this.replaceWith(document.createTextNode(\'Publishing\'))">':imgIcon())+'</div><div>'+
+    '<div class="imgrow"><div class="imgthumb">'+(s.img?'<img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="" onerror="this.replaceWith(document.createTextNode(\'Publishing\'))">':imgIcon())+'</div><div>'+
       '<button type="button" class="btn sm" data-act="pickimg" data-id="'+id+'"'+((!hasBackend()||uploading[id])?' disabled':'')+'>'+(uploading[id]?'Uploading':(s.img?'Replace image':'Upload image'))+'</button>'+
       (s.img?' <button type="button" class="btn sm" data-act="rmimg" data-id="'+id+'">Remove image</button>':'')+
       '<input type="file" accept="image/*" class="imgfile" data-act="imgfile" data-id="'+id+'" hidden>'+
       '<div class="imghint" id="imgmsg-'+id+'">'+(hasBackend()?'Resized to 1600 px and saved to the shared repo. It can take a minute to appear for others.':'Image upload needs the shared server.')+'</div></div></div>'+
     '<div class="cprow"><label class="cplab" for="b-'+id+'-cpDesc">CP:</label>'+bIn(s,"cpDesc","description","CP description","d")+'<span class="at" aria-hidden="true">@</span>'+bIn(s,"cpCoords","coordinates","CP coordinates","c")+'</div>'+
     '<div><label class="flab" for="b-'+id+'-obs">Obstructions/Complications</label><textarea class="notearea" id="b-'+id+'-obs" data-act="brief" data-id="'+id+'" data-field="obs" rows="3" maxlength="2000" placeholder="One per line">'+esc((s.brief||{}).obs||"")+'</textarea></div>'+
-    '<div class="crcl">'+crcl(s,"cr","CR · Crowd right, miles to CP")+crcl(s,"cl","CL · Crowd left, miles to CP")+'</div>'+
+    '<div class="crcl">'+crcl(s,"cr","CR · Crowd right, miles to CP")+crcl(s,"cl","CL · Crowd left, miles to CP")+'</div>'+cardSec(s)+
     '<div><label class="flab" for="note-'+id+'">Notes</label><textarea class="notearea" id="note-'+id+'" data-act="note" data-id="'+id+'" maxlength="4000" placeholder="Free-text notes for this site">'+esc(s.notes||"")+'</textarea></div>'+
     '</div></td></tr>';
 }
@@ -806,6 +828,7 @@ function renderRows(){
     var nt=document.getElementById(keep.id);
     if(nt){nt.focus();try{nt.setSelectionRange(keep.s,keep.e)}catch(x){}nt.scrollTop=keep.t}
   }
+  list.forEach(function(s){if(openNotes[s.id])cardUi(s)});
 }
 function liHtml(ac,id,opts){
   var s=site(id),fl=s.flights[ac],rt=s.rating[ac];
@@ -835,13 +858,213 @@ function renderSpinner(ac){
 }
 function render(){renderHeader();renderChips();renderMapFilter();renderRows();AIR.forEach(function(p){renderSpinner(p[0])});renderNow()}
 
+/* ---- Ground reference card ---- */
+var CARD={W:1240,H:1720,M:44,GAP:34,HEAD:170,REF:["MID TREE FARM","BF T-JUNCTION"],FILL:.94,MAXC:13};
+var CARDFONT='Jost,Futura,"Century Gothic","Trebuchet MS",sans-serif';
+var _mc=null;
+function mctx(){if(!_mc){try{_mc=document.createElement("canvas").getContext("2d")}catch(e){_mc=false}}return _mc||null}
+function cardCW(){return (CARD.W-2*CARD.M-CARD.GAP)/2}
+function cardBudget(){return cardCW()*CARD.FILL}
+function cardPx(){
+  var c=mctx();if(!c)return 60;
+  c.font='700 100px '+CARDFONT;
+  var w=Math.max(c.measureText(CARD.REF[0]).width,c.measureText(CARD.REF[1]).width);
+  return Math.floor(100*cardBudget()/w)||60;
+}
+/* width of a line as a fraction of the budget; the reference lines are exactly 1.0 or less */
+function fitW(t){
+  var c=mctx();
+  if(!c)return t.length/CARD.MAXC;
+  c.font='700 '+cardPx()+'px '+CARDFONT;
+  return c.measureText(t).width/cardBudget();
+}
+function cardLine(p,n,i,t){
+  t=String(t||"").trim().toUpperCase();
+  if(i===1)return t;
+  return p==="cl"?(n+"- "+t).trim():(t+" -"+n).trim();
+}
+var ABBR=[[/\bJUNCTION\b/g,"JCT"],[/\bINTERCHANGE\b/g,"INTCHG"],[/\bCROSSING\b/g,"XING"],[/\bFACTORY\b/g,"FCTY"],[/\bCOMPLEX\b/g,"CMPLX"],[/\bINTERSECTION\b/g,"INTSN"],[/\bROAD\b/g,"RD"],[/\bSTREET\b/g,"ST"],[/\bHIGHWAY\b/g,"HWY"],[/\bFREEWAY\b/g,"FWY"],[/\bRIVER\b/g,"RVR"],[/\bMOUNTAINS\b/g,"MTNS"],[/\bMOUNTAIN\b/g,"MTN"],[/\bAIRPORT\b/g,"APT"],[/\bAIRFIELD\b/g,"AF"],[/\bBUILDINGS\b/g,"BLDGS"],[/\bBUILDING\b/g,"BLDG"],[/\bBRIDGE\b/g,"BRG"],[/\bLAKE\b/g,"LK"],[/\bTOWER\b/g,"TWR"],[/\bRAILROAD\b/g,"RR"],[/\bRAILWAY\b/g,"RY"],[/\bINTERSTATE\b/g,"I"],[/\bNORTHEAST\b/g,"NE"],[/\bNORTHWEST\b/g,"NW"],[/\bSOUTHEAST\b/g,"SE"],[/\bSOUTHWEST\b/g,"SW"],[/\bNORTH\b/g,"N"],[/\bSOUTH\b/g,"S"],[/\bEAST\b/g,"E"],[/\bWEST\b/g,"W"],[/\bNEAR\b/g,"NR"],[/\bBEHIND\b/g,"BHND"],[/\bBETWEEN\b/g,"BTWN"],[/\bSTADIUM\b/g,"STDM"],[/\bHARBOR\b/g,"HBR"],[/\bISLAND\b/g,"ISL"],[/\bCOASTLINE\b/g,"COAST"],[/\bPOWER ?LINES?\b/g,"PWR LN"],[/\bAND\b/g,"&"]];
+var FILLER=/\b(THE|A|AN|OF|TO|AT|ON|IN|IS|WITH|FROM|AND)\b/g;
+function norm(t){return String(t||"").toUpperCase().replace(/[^A-Z0-9&\/.'\- ]+/g," ").replace(/\s+/g," ").trim()}
+function abbr(t){ABBR.forEach(function(a){t=t.replace(a[0],a[1])});return t.replace(/\s+/g," ").trim()}
+function wrap2(words,p,n){
+  var l1=[],i=0;
+  while(i<words.length){
+    var t=l1.concat(words[i]).join(" ");
+    if(l1.length&&fitW(cardLine(p,n,0,t))>1)break;
+    l1.push(words[i]);i++;
+  }
+  return [l1.join(" "),words.slice(i).join(" ")];
+}
+function lineOk(l,p,n){return fitW(cardLine(p,n,0,l[0]))<=1&&fitW(cardLine(p,n,1,l[1]))<=1}
+/* the first clause only, with anything in brackets dropped: "X, parallel Y on left (note)" -> "X" */
+function clause(raw){return String(raw||"").replace(/\([^)]*\)/g," ").split(/[,;]/)[0]}
+/* words that add little on a card */
+function lowInfo(t){
+  return t.replace(/\bPARALLEL( TO| WITH)?\b/g,"PARA").replace(/\b(JUST|YOUR|THERE|ALSO|APPROX(IMATELY)?)\b/g," ")
+    .replace(/\bRIGHT (?=(BEFORE|OVER|AFTER|AT|ON|IN|BETWEEN|NEXT)\b)/g," ").replace(/\bON (THE )?(L|R|LEFT|RIGHT)$/g," ")
+    .replace(/\s+/g," ").trim();
+}
+function draftLines(raw,p,n){
+  var full=norm(raw);
+  if(!full)return {l:["",""],cut:false};
+  var nf=function(x){return x.replace(FILLER,"").replace(/\s+/g," ").trim()},c=norm(clause(raw));
+  var stages=[full,c,nf(c),nf(abbr(c)),nf(lowInfo(abbr(c))),nf(lowInfo(abbr(full)))],r;
+  for(var i=0;i<stages.length;i++){
+    if(!stages[i])continue;
+    r=wrap2(stages[i].split(" ").filter(Boolean),p,n);
+    if(lineOk(r,p,n))return {l:r,cut:false};
+  }
+  r=wrap2(stages[4].split(" ").filter(Boolean),p,n);
+  var w=r[1].split(" ").filter(Boolean);
+  while(w.length&&fitW(w.join(" "))>1)w.pop();
+  r[1]=w.join(" ");
+  if(fitW(cardLine(p,n,0,r[0]))>1){var a=r[0].split(" ");while(a.length>1&&fitW(cardLine(p,n,0,a.join(" ")))>1)a.pop();r[0]=a.join(" ")}
+  return {l:r,cut:true};
+}
+function cardCell(s,p,n){
+  var b=s.brief||{},a=String(b["k"+p+n+"a"]||"").trim(),c=String(b["k"+p+n+"b"]||"").trim();
+  if(a||c)return {l:[a.toUpperCase(),c.toUpperCase()],auto:false,cut:false};
+  var d=draftLines(b[p+n],p,n);
+  return {l:d.l,auto:true,cut:d.cut};
+}
+function drawCard(cv,s){
+  var ctx=cv.getContext&&cv.getContext("2d");if(!ctx)return;
+  var W=CARD.W,H=CARD.H,M=CARD.M,cw=cardCW(),px=cardPx(),pad=cw*(1-CARD.FILL)/2;
+  cv.width=W;cv.height=H;
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="#111";ctx.textBaseline="alphabetic";
+  var f='700 '+px+'px '+CARDFONT;
+  ctx.font='700 '+Math.round(px*1.05)+'px '+CARDFONT;
+  ctx.textAlign="left";ctx.fillText("CL",M+pad,M+px*1.05);
+  ctx.textAlign="right";ctx.fillText("CR",W-M-pad,M+px*1.05);
+  ctx.font='600 '+Math.round(px*.52)+'px '+CARDFONT;ctx.textAlign="center";
+  var nm=s.name.toUpperCase();
+  while(nm.length>3&&ctx.measureText(nm).width>W-2*M-2*cw*.55&&nm.length>3)nm=nm.slice(0,-1);
+  ctx.fillStyle="#555";ctx.fillText(nm,W/2,M+px*1.05);
+  var y0=M+CARD.HEAD,rh=(H-M-y0)/4;
+  ctx.strokeStyle="#111";ctx.lineWidth=4;ctx.fillStyle="#111";ctx.font=f;
+  [4,3,2,1].forEach(function(n,i){
+    var top=y0+i*rh;
+    ["cl","cr"].forEach(function(p){
+      var x=p==="cl"?M:M+cw+CARD.GAP;
+      ctx.strokeRect(x,top+2,cw,rh-4);
+      var cell=cardCell(s,p,n);
+      ctx.textAlign=p==="cl"?"left":"right";
+      var tx=p==="cl"?x+pad:x+cw-pad;
+      ctx.fillText(cardLine(p,n,0,cell.l[0]),tx,top+rh*.42);
+      if(cell.l[1])ctx.fillText(cardLine(p,n,1,cell.l[1]),tx,top+rh*.42+px*1.25);
+    });
+  });
+}
+function cardFontReady(){
+  try{if(document.fonts&&document.fonts.load)document.fonts.load('700 60px Jost').then(function(){_mc=null;paintCards()})}catch(e){}
+}
+function paintCards(root){
+  var list=(root||document).querySelectorAll("canvas.cardcv");
+  for(var i=0;i<list.length;i++){var s=site(list[i].getAttribute("data-id"));if(s)drawCard(list[i],s)}
+}
+var GENMS=5000,genTimers={},kneeOn={};
+function srcOf(s,p,n){return String((s.brief||{})[p+n]||"").trim()}
+/* state of one marker: ok / blank / error text */
+function cellState(s,p,n){
+  var b=s.brief||{},a=String(b["k"+p+n+"a"]||"").trim(),c=String(b["k"+p+n+"b"]||"").trim(),src=srcOf(s,p,n);
+  if(a||c){
+    var l=[a.toUpperCase(),c.toUpperCase()];
+    if(!lineOk(l,p,n))return {l:l,err:"Too wide for the card. Shorten this text."};
+    return {l:l};
+  }
+  if(!src)return {l:["",""],blank:true};
+  var d=draftLines(src,p,n);
+  if(d.cut)return {l:d.l,err:"Can't shorten this to fit the card (about "+CARD.MAXC+" characters per line). Type a short version here."};
+  return {l:d.l,auto:true};
+}
+function kneeErrors(s){
+  var out=[];
+  ["cl","cr"].forEach(function(p){[4,3,2,1].forEach(function(n){
+    var st=cellState(s,p,n);if(st.err)out.push(p.toUpperCase()+" "+n+"m")})});
+  return out;
+}
+/* after the pause, turn the marker's text into the short two-line version */
+function genShort(s,p,n){
+  var b=s.brief||(s.brief=blankBrief()),ka="k"+p+n+"a",kb="k"+p+n+"b",kg="g"+p+n;
+  var cur=String(b[ka]||"")+"|"+String(b[kb]||""),prev=b[kg]||"";
+  if(cur!=="|"&&cur!==prev){cardUi(s);return}   /* hand-edited: leave it alone */
+  var src=srcOf(s,p,n),d=src?draftLines(src,p,n):{l:["",""],cut:false};
+  if(d.cut||!src){b[ka]="";b[kb]="";b[kg]=""}
+  else{b[ka]=d.l[0];b[kb]=d.l[1];b[kg]=d.l[0]+"|"+d.l[1]}
+  persist();
+  [["a",ka],["b",kb]].forEach(function(x){var el=document.getElementById("b-"+s.id+"-"+x[1]);if(el)el.value=b[x[1]]});
+  cardUi(s);
+}
+function queueShort(s,p,n){
+  var k=s.id+p+n;clearTimeout(genTimers[k]);
+  var c=document.getElementById("cnt-"+s.id+"-k"+p+n+"a");if(c){c.textContent="…";c.className="cnt wait"}
+  genTimers[k]=setTimeout(function(){delete genTimers[k];var t=site(s.id);if(t)genShort(t,p,n)},GENMS);
+}
+function cardUi(s){
+  ["cl","cr"].forEach(function(p){[4,3,2,1].forEach(function(n){
+    var st=cellState(s,p,n);
+    ["a","b"].forEach(function(k,i){
+      var key="k"+p+n+k,inp=document.getElementById("b-"+s.id+"-"+key),cnt=document.getElementById("cnt-"+s.id+"-"+key);
+      var txt=cardLine(p,n,i,st.l[i]),over=fitW(txt)>1;
+      var mx=CARD.MAXC-(i===0?cardLine(p,n,0,"").length+1:0);
+      if(inp)inp.classList.toggle("over",!!st.err&&i===0||over);
+      if(cnt){cnt.textContent=(st.l[i]||"").length+"/"+mx;cnt.className="cnt"+(over?" over":"")}
+    });
+    var er=document.getElementById("cerr-"+s.id+"-"+p+n);
+    if(er){er.textContent=st.err?(p.toUpperCase()+" "+n+"m: "+st.err):"";er.hidden=!st.err}
+  })});
+  var bad=kneeErrors(s);
+  if(bad.length)["ed","now"].forEach(function(w){kneeOn[w+s.id]=false;var o=document.getElementById("knee-"+w+"-"+s.id);if(o)o.innerHTML=kneeMsg(bad)});
+  else paintCards();
+}
+function kneeMsg(bad){return '<div class="kneeerr" role="alert"><b>Can\'t generate the kneeboard.</b> The short text for '+bad.join(", ")+' doesn\'t fit. Fix it in the Ground card section of the Edit tab.</div>'}
+function kneeOut(w,s){
+  var bad=kneeErrors(s);
+  if(bad.length)return kneeMsg(bad);
+  if(!kneeOn[w+s.id])return "";
+  return '<canvas class="cardcv" data-id="'+s.id+'" aria-label="Kneeboard for '+esc(s.name)+'"></canvas><div><button type="button" class="btn sm" data-act="cardpng" data-id="'+s.id+'">Download PNG</button></div>';
+}
+function kneeBlock(w,s){
+  return '<div class="kneeblk"><button type="button" class="btn" data-act="kneeboard" data-where="'+w+'" data-id="'+s.id+'">'+(kneeOn[w+s.id]?'Regenerate kneeboard':'Generate kneeboard')+'</button><div class="kneeout" id="knee-'+w+'-'+s.id+'">'+kneeOut(w,s)+'</div></div>';
+}
+function kneeGo(w,s){
+  var bad=kneeErrors(s);
+  kneeOn[w+s.id]=!bad.length;
+  var o=document.getElementById("knee-"+w+"-"+s.id);
+  if(o)o.innerHTML=kneeOut(w,s);
+  if(!bad.length)paintCards(o);else toast("Fix the short text first");
+}
+function cardPng(s){
+  var cv=document.createElement("canvas");drawCard(cv,s);
+  var slug=s.name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"site";
+  var go=function(blob){
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="kneeboard-"+slug+".png";
+    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);toast("Kneeboard downloaded");
+  };
+  if(cv.toBlob)cv.toBlob(function(b){if(b)go(b)},"image/png");
+}
+function cIn(s,key,i){
+  return '<span class="cf"><input type="text" class="bin" id="b-'+s.id+'-'+key+'" data-act="brief" data-id="'+s.id+'" data-field="'+key+'" value="'+esc((s.brief||{})[key]||"")+'" placeholder="short text" maxlength="16" autocomplete="off" aria-label="'+esc("Short text line "+(i+1)+" "+key.slice(1,3).toUpperCase()+" "+key.charAt(3)+"m for "+s.name)+'"><em class="cnt" id="cnt-'+s.id+'-'+key+'"></em></span>';
+}
+function cardSec(s){
+  function side(p,title){
+    return '<fieldset><legend>'+title+'</legend>'+[4,3,2,1].map(function(n){
+      return '<div class="mrow"><span>'+n+'m</span>'+cIn(s,"k"+p+n+"a",0)+cIn(s,"k"+p+n+"b",1)+'</div><div class="cerr" id="cerr-'+s.id+'-'+p+n+'" role="alert" hidden></div>';
+    }).join("")+'</fieldset>';
+  }
+  return '<div class="cardsec"><div class="brhead"><b>Kneeboard short text</b></div>'+
+    '<div class="hint">Filled in automatically 5 seconds after you stop typing a CR/CL line. Edit it freely; your edit is kept. Each line holds about '+CARD.MAXC+' characters.</div>'+
+    '<div class="crcl">'+side("cl","CL · left of the CP")+side("cr","CR · right of the CP")+'</div>'+kneeBlock("ed",s)+'</div>';
+}
 function imgIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>'}
 var AC_SUB={a4:"1979 A-4",f18:"F/A-18C"};
 function rungs(b,p,s){
   return [4,3,2,1].map(function(n){
     var v=String(b[p+n]||"").trim(),im=s&&s.mimg&&s.mimg[p+n];
     return '<div class="rung'+(v?'':' none')+'"><b>'+n+'m</b><span>'+(v?esc(v):'&mdash;')+'</span></div>'+
-      (im?'<details class="rungimg"><summary>Image</summary><img loading="lazy" src="'+esc(imgSrc(im))+'" alt="'+esc(p.toUpperCase()+" "+n+"m")+'" onerror="this.replaceWith(document.createTextNode(\'Still publishing, reload in a minute.\'))"></details>':'');
+      (im?'<details class="rungimg"><summary>Image</summary><img data-zoom="1" tabindex="0" loading="lazy" src="'+esc(imgSrc(im))+'" alt="'+esc(p.toUpperCase()+" "+n+"m")+'" onerror="this.replaceWith(document.createTextNode(\'Still publishing, reload in a minute.\'))"></details>':'');
   }).join("");
 }
 function nowSw(ac){
@@ -863,7 +1086,7 @@ function renderNow(){
   var ol=String(b.obs||"").split("\n").map(function(l){return l.trim().replace(/^-\s*/,"")}).filter(Boolean);
   var obs=ol.length?'<div><div class="bk">Obstructions / complications</div><ul class="obs">'+ol.map(function(l){return '<li>'+esc(l)+'</li>'}).join("")+'</ul></div>':'';
   var anyLadder=BKEYS.some(function(k){return /^c[lr]\d$/.test(k)&&b[k]});
-  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div></div>':'';
+  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div></div>'+kneeBlock("now",s):'';
   var nt=s.notes?'<div><div class="bk">Notes</div><div class="nownotes">'+esc(s.notes)+'</div></div>':'';
   var brief=hasBrief(s)?cp+obs+lad+nt:'<div class="nobrief">No briefing for this site yet. Fill it in under Notes on the <button type="button" class="ghost" data-act="tab" data-tab="working">Working tab</button>.</div>';
   el.innerHTML='<div class="now">'+
@@ -871,8 +1094,9 @@ function renderNow(){
     '<div class="nowhero"><div class="acbadge"><b>'+AC_LABEL[ac]+'</b><span>'+AC_SUB[ac]+'</span></div>'+
       '<div><h2 class="nowname">'+esc(s.name)+icons+'</h2>'+
       '<div class="nowmeta"><span>'+(s.map?esc(mapLabel(s.map)):'No theater set')+'</span>'+pill(s.rating[ac])+'<span>Flown <b>'+s.flights[ac]+'</b> time'+(s.flights[ac]===1?'':'s')+' in the '+AC_LABEL[ac]+'</span></div></div></div>'+
-    '<div class="nowgrid">'+(s.img?'<div class="imgbox"><img src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+
+    '<div class="nowgrid">'+(s.img?'<div class="imgbox"><img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+
     '<div class="nowbrief">'+brief+'</div></div></div>';
+  paintCards(el);
 }
 
 function copyBtn(ac,which){return '<button class="btn sm" data-act="copy" data-which="'+which+'" data-ac="'+ac+'">Copy list</button>'}
@@ -932,12 +1156,6 @@ function shrink(file,q){
     im.src=u;
   });
 }
-/* remove a file from the repo once no site points at it any more */
-function dropImage(path){
-  if(!path||!hasBackend())return;
-  for(var i=0;i<S.sites.length;i++){var x=S.sites[i];if(x.img===path)return;if(x.mimg)for(var k in x.mimg)if(x.mimg[k]===path)return}
-  call({action:"delete",path:path}).catch(function(){});
-}
 function uploadImage(id,file,slot){
   var s=site(id),uk=id+(slot||"");if(!s||!file||uploading[uk])return;
   var imgMsg=function(i,m){if(slot)toast(m);else{var e=document.getElementById("imgmsg-"+i);if(e)e.textContent=m}};
@@ -948,7 +1166,7 @@ function uploadImage(id,file,slot){
     imgMsg(id,"Uploading");
     return call({action:"upload",id:slot?id+"-"+slot:id,data:d.split(",")[1]}).then(function(r){
       if(r&&r.ok&&r.path){
-        imgCache[r.path]=d;var t=site(id);if(t){var old;if(slot){if(!t.mimg)t.mimg=cleanMimg();old=t.mimg[slot];t.mimg[slot]=r.path}else{old=t.img;t.img=r.path}persist();if(old&&old!==r.path)dropImage(old)}
+        imgCache[r.path]=d;var t=site(id);if(t){if(slot){if(!t.mimg)t.mimg=cleanMimg();t.mimg[slot]=r.path}else t.img=r.path;persist()}
       }else if(r&&r.error==="auth"){showGate("That passcode didn't work.")}
       else throw new Error((r&&r.error)||"server");
     });
@@ -1100,7 +1318,7 @@ function init(){
       RATINGS.map(function(r){return '<option value="'+r[0]+'">'+p[1]+': '+r[1]+'</option>'}).join("")+'</select>';
   }).join("");
   showTab(location.hash.replace("#",""));
-  render();setStatus("loading");
+  render();cardFontReady();setStatus("loading");
   try{var raw=localStorage.getItem(LS_STATE);if(raw){var o=JSON.parse(raw),old=!o.ac;S=normalize(o);var mg=migrate(S);render();if(mg||old)localSave()}}catch(e){}
   $("importFile").addEventListener("change",function(e){var f=e.target.files&&e.target.files[0];if(f)importJson(f);e.target.value=""});
   if(!hasBackend()){setStatus("local");return}
@@ -1354,6 +1572,35 @@ document.addEventListener("drop",function(e){
   e.preventDefault();var id=dragId;dragId=null;clearMarks();moveDraft(id,t.list,t.idx);
 });
 $("wheelModal").addEventListener("mousedown",function(e){if(e.target.id==="wheelModal")closeWheel()});
+/* ---------- click an image for a large preview ---------- */
+var lbFrom=null;
+function openLightbox(img){
+  var box=$("lightbox");lbFrom=img;
+  $("lbImg").src=img.currentSrc||img.src;$("lbImg").alt=img.alt||"";
+  var d=img.closest("details.rungimg"),cap=img.alt||"";
+  $("lbCap").textContent=cap;
+  box.hidden=false;$("lbClose").focus();
+}
+function closeLightbox(){
+  var box=$("lightbox");if(box.hidden)return;
+  box.hidden=true;$("lbImg").removeAttribute("src");
+  if(lbFrom&&document.body.contains(lbFrom))lbFrom.focus();lbFrom=null;
+}
+document.addEventListener("click",function(e){
+  var t=e.target;
+  if(t&&t.getAttribute&&t.getAttribute("data-zoom")&&t.tagName==="IMG"){openLightbox(t);return}
+  if(t&&(t.id==="lightbox"||t.id==="lbClose"||t.id==="lbCap"))closeLightbox();
+});
+document.addEventListener("keydown",function(e){
+  var box=$("lightbox");
+  if(!box.hidden){
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeLightbox()}
+    else if(e.key==="Tab"){e.preventDefault();$("lbClose").focus()}
+    return;
+  }
+  var t=e.target;
+  if((e.key==="Enter"||e.key===" ")&&t&&t.tagName==="IMG"&&t.getAttribute("data-zoom")){e.preventDefault();openLightbox(t)}
+},true);
 document.addEventListener("keydown",function(e){
   var m=$("wheelModal");if(m.hidden)return;
   if(e.key==="Escape"){e.preventDefault();var op=m.querySelector("details.ms[open]");if(op){op.removeAttribute("open");op.querySelector("summary").focus()}else closeWheel();return}
@@ -1382,7 +1629,9 @@ document.addEventListener("click",function(e){
     if(openNotes[id]){var nta=document.getElementById("b-"+id+"-cpDesc");if(nta)nta.focus()}
   }
   else if(act==="pickimg"){var fi=el.parentNode.querySelector("input.imgfile");if(fi)fi.click()}
-  else if(act==="rmimg"){var rs=site(id),sl=el.getAttribute("data-slot");if(rs){var gone="";if(sl&&rs.mimg&&rs.mimg[sl]){gone=rs.mimg[sl];rs.mimg[sl]=""}else if(!sl&&rs.img){gone=rs.img;rs.img=""}if(gone){persist();renderRows();renderNow();dropImage(gone)}}}
+  else if(act==="rmimg"){var rs=site(id),sl=el.getAttribute("data-slot");if(rs&&sl&&rs.mimg&&rs.mimg[sl]){rs.mimg[sl]="";persist();renderRows();renderNow()}else if(rs&&!sl&&rs.img){rs.img="";persist();renderRows();renderNow()}}
+  else if(act==="kneeboard"){var ks=site(id);if(ks)kneeGo(el.getAttribute("data-where"),ks)}
+  else if(act==="cardpng"){var ps=site(id);if(ps&&!kneeErrors(ps).length)cardPng(ps)}
   else if(act==="copybrief"){var cs=site(id);if(cs)copyText(briefText(cs),"Briefing copied")}
   else if(act==="openwheel")openWheel(ac);
   else if(act==="wclose")closeWheel();
@@ -1460,9 +1709,15 @@ document.addEventListener("input",function(e){
   if(a==="note")s.notes=el.value;
   else{
     var f=el.getAttribute("data-field");
-    if(BKEYS.indexOf(f)<0)return;
+    if(BKEYS.indexOf(f)<0&&CKEYS.indexOf(f)<0)return;
     if(!s.brief)s.brief=blankBrief();
     s.brief[f]=el.value;
+    var cm=/^c([lr])([1-4])$/.exec(f);
+    if(cm)queueShort(s,"c"+cm[1],+cm[2]);
+    else{
+      var km=/^k(c[lr])([1-4])[ab]$/.exec(f);
+      if(km&&!String(s.brief["k"+km[1]+km[2]+"a"]||"").trim()&&!String(s.brief["k"+km[1]+km[2]+"b"]||"").trim()){s.brief["g"+km[1]+km[2]]="";queueShort(s,km[1],+km[2])}
+      else if(km)cardUi(s)}
   }
   persist();
   var dot=document.querySelector('.notebtn[data-id="'+s.id+'"] .dot');
