@@ -864,7 +864,7 @@ function renderSpinner(ac){
 function render(){renderHeader();renderChips();renderMapFilter();renderRows();AIR.forEach(function(p){renderSpinner(p[0])});renderNow()}
 
 /* ---- Ground reference card ---- */
-var CARD={W:1240,H:1720,M:44,GAP:34,HEAD:170,REF:["MID TREE FARM","BF T-JUNCTION"],FILL:.94,MAXC:13};
+var CARD={W:1240,H:1720,M:44,GAP:34,HEAD:300,REF:["MID TREE FARM","BF T-JUNCTION"],FILL:.94,MAXC:13};
 var CARDFONT='Jost,Futura,"Century Gothic","Trebuchet MS",sans-serif';
 var _mc=null;
 function mctx(){if(!_mc){try{_mc=document.createElement("canvas").getContext("2d")}catch(e){_mc=false}}return _mc||null}
@@ -946,8 +946,8 @@ function drawCard(cv,s){
   /* field name: big, black, bold. Wraps to 2 or 3 lines at full size first; only shrinks if even that cannot fit */
   ctx.font='700 '+Math.round(px*1.05)+'px '+CARDFONT;
   var lab=Math.max(ctx.measureText("CL").width,ctx.measureText("CR").width),avail=W-2*M-2*pad-2*lab-2*28;
-  var nm=s.name.toUpperCase().replace(/\s+/g," ").trim(),fs=Math.round(px*.95),minfs=Math.round(px*.6),nl=[nm];
-  function wrapN(words,n){   /* split words into <= n lines, minimising the widest line; null if a word is too wide */
+  var nm=s.name.toUpperCase().replace(/\s+/g," ").trim(),bandH=CARD.HEAD-36,nl=[nm],fs=0;
+  function wrapN(words,n){   /* split words into <= n lines, minimising the widest line; null if too wide */
     var best=null,bw=1e9;
     (function go(i,acc){
       if(acc.length>n)return;
@@ -957,19 +957,21 @@ function drawCard(cv,s){
     })(0,[]);
     return best&&bw<=avail?best:null;
   }
-  for(;;){
-    ctx.font='700 '+fs+'px '+CARDFONT;
-    var words=nm.split(" "),got=null;
-    for(var n=1;n<=3&&!got;n++)got=wrapN(words,n);
-    if(got){nl=got;break}
-    if(fs<=minfs){nl=[nm];while(nl[0].length>3&&ctx.measureText(nl[0]).width>avail)nl[0]=nl[0].slice(0,-1);break}
-    fs-=2;
+  /* biggest font that fits: try 1, 2 or 3 lines inside the header band, largest size wins */
+  var words=nm.split(" ");
+  for(var ff=Math.round(px*2.2);ff>=24&&!fs;ff-=2){
+    ctx.font='700 '+ff+'px '+CARDFONT;
+    for(var n=1;n<=3;n++){
+      if(Math.round(ff*1.04)*(n-1)+ff*.72>bandH)break;
+      var got=wrapN(words,n);if(got){nl=got;fs=ff;break}
+    }
   }
-  var lh=Math.round(fs*1.08),base=M+px*1.05;
+  if(!fs){fs=24;ctx.font='700 24px '+CARDFONT;nl=[nm];while(nl[0].length>3&&ctx.measureText(nl[0]).width>avail)nl[0]=nl[0].slice(0,-1)}
+  ctx.font='700 '+fs+'px '+CARDFONT;
+  var lh=Math.round(fs*1.04),blockH=(nl.length-1)*lh+fs*.72,base=M+(bandH-blockH)/2+fs*.72;
   ctx.textAlign="center";ctx.fillStyle="#111";
   nl.forEach(function(l,i){ctx.fillText(l,W/2,base+i*lh)});
-  var headEnd=base+(nl.length-1)*lh+px*.45;
-  var y0=Math.max(M+CARD.HEAD,headEnd),rh=(H-M-y0)/4;
+  var y0=M+CARD.HEAD,rh=(H-M-y0)/4;
   ctx.strokeStyle="#111";ctx.lineWidth=4;ctx.fillStyle="#111";ctx.font=f;
   [4,3,2,1].forEach(function(n,i){
     var top=y0+i*rh;
