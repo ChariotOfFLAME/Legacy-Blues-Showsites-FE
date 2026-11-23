@@ -97,6 +97,12 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .kneeout{display:flex;flex-direction:column;gap:8px;align-items:flex-start;max-width:100%}
 .kneeout:empty{display:none}
 canvas.cardcv{width:min(100%,420px);height:auto;aspect-ratio:124/172;border:1px solid var(--line);border-radius:6px;background:#fff}
+img[data-zoom]{cursor:zoom-in}
+.lightbox{position:fixed;inset:0;z-index:80;background:rgba(5,8,16,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));cursor:zoom-out}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:100%;max-height:calc(100% - 44px);object-fit:contain;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:default}
+.lbcap{color:#E7ECF6;font-size:14px;text-align:center}
+.lbx{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.5);color:#fff;font-size:28px;line-height:1;cursor:pointer}
 .imgrow{display:flex;gap:12px;align-items:center}
 .imgthumb{width:72px;height:48px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
 .imgthumb svg{width:24px;height:24px}
@@ -384,6 +390,7 @@ ul.dl li.before{box-shadow:0 -3px 0 var(--accent)}
     </footer>
   </div>
 </div>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image preview" hidden><button type="button" class="lbx" id="lbClose" aria-label="Close preview">&times;</button><img id="lbImg" alt=""><div class="lbcap" id="lbCap"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -779,7 +786,7 @@ function notesRow(s){
   var id=s.id;
   return '<tr class="notesrow"><td colspan="8"><div class="brief">'+
     '<div class="brhead"><b>Briefing for '+esc(s.name)+'</b><button type="button" class="btn sm" data-act="copybrief" data-id="'+id+'">Copy as text</button></div>'+
-    '<div class="imgrow"><div class="imgthumb">'+(s.img?'<img src="'+esc(imgSrc(s.img))+'" alt="" onerror="this.replaceWith(document.createTextNode(\'Publishing\'))">':imgIcon())+'</div><div>'+
+    '<div class="imgrow"><div class="imgthumb">'+(s.img?'<img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="" onerror="this.replaceWith(document.createTextNode(\'Publishing\'))">':imgIcon())+'</div><div>'+
       '<button type="button" class="btn sm" data-act="pickimg" data-id="'+id+'"'+((!hasBackend()||uploading[id])?' disabled':'')+'>'+(uploading[id]?'Uploading':(s.img?'Replace image':'Upload image'))+'</button>'+
       (s.img?' <button type="button" class="btn sm" data-act="rmimg" data-id="'+id+'">Remove image</button>':'')+
       '<input type="file" accept="image/*" class="imgfile" data-act="imgfile" data-id="'+id+'" hidden>'+
@@ -1046,7 +1053,7 @@ function rungs(b,p,s){
   return [4,3,2,1].map(function(n){
     var v=String(b[p+n]||"").trim(),im=s&&s.mimg&&s.mimg[p+n];
     return '<div class="rung'+(v?'':' none')+'"><b>'+n+'m</b><span>'+(v?esc(v):'&mdash;')+'</span></div>'+
-      (im?'<details class="rungimg"><summary>Image</summary><img loading="lazy" src="'+esc(imgSrc(im))+'" alt="'+esc(p.toUpperCase()+" "+n+"m")+'" onerror="this.replaceWith(document.createTextNode(\'Still publishing, reload in a minute.\'))"></details>':'');
+      (im?'<details class="rungimg"><summary>Image</summary><img data-zoom="1" tabindex="0" loading="lazy" src="'+esc(imgSrc(im))+'" alt="'+esc(p.toUpperCase()+" "+n+"m")+'" onerror="this.replaceWith(document.createTextNode(\'Still publishing, reload in a minute.\'))"></details>':'');
   }).join("");
 }
 function nowSw(ac){
@@ -1076,7 +1083,7 @@ function renderNow(){
     '<div class="nowhero"><div class="acbadge"><b>'+AC_LABEL[ac]+'</b><span>'+AC_SUB[ac]+'</span></div>'+
       '<div><h2 class="nowname">'+esc(s.name)+icons+'</h2>'+
       '<div class="nowmeta"><span>'+(s.map?esc(mapLabel(s.map)):'No theater set')+'</span>'+pill(s.rating[ac])+'<span>Flown <b>'+s.flights[ac]+'</b> time'+(s.flights[ac]===1?'':'s')+' in the '+AC_LABEL[ac]+'</span></div></div></div>'+
-    '<div class="nowgrid">'+(s.img?'<div class="imgbox"><img src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+
+    '<div class="nowgrid">'+(s.img?'<div class="imgbox"><img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+
     '<div class="nowbrief">'+brief+'</div></div></div>';
   paintCards(el);
 }
@@ -1554,6 +1561,35 @@ document.addEventListener("drop",function(e){
   e.preventDefault();var id=dragId;dragId=null;clearMarks();moveDraft(id,t.list,t.idx);
 });
 $("wheelModal").addEventListener("mousedown",function(e){if(e.target.id==="wheelModal")closeWheel()});
+/* ---------- click an image for a large preview ---------- */
+var lbFrom=null;
+function openLightbox(img){
+  var box=$("lightbox");lbFrom=img;
+  $("lbImg").src=img.currentSrc||img.src;$("lbImg").alt=img.alt||"";
+  var d=img.closest("details.rungimg"),cap=img.alt||"";
+  $("lbCap").textContent=cap;
+  box.hidden=false;$("lbClose").focus();
+}
+function closeLightbox(){
+  var box=$("lightbox");if(box.hidden)return;
+  box.hidden=true;$("lbImg").removeAttribute("src");
+  if(lbFrom&&document.body.contains(lbFrom))lbFrom.focus();lbFrom=null;
+}
+document.addEventListener("click",function(e){
+  var t=e.target;
+  if(t&&t.getAttribute&&t.getAttribute("data-zoom")&&t.tagName==="IMG"){openLightbox(t);return}
+  if(t&&(t.id==="lightbox"||t.id==="lbClose"||t.id==="lbCap"))closeLightbox();
+});
+document.addEventListener("keydown",function(e){
+  var box=$("lightbox");
+  if(!box.hidden){
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closeLightbox()}
+    else if(e.key==="Tab"){e.preventDefault();$("lbClose").focus()}
+    return;
+  }
+  var t=e.target;
+  if((e.key==="Enter"||e.key===" ")&&t&&t.tagName==="IMG"&&t.getAttribute("data-zoom")){e.preventDefault();openLightbox(t)}
+},true);
 document.addEventListener("keydown",function(e){
   var m=$("wheelModal");if(m.hidden)return;
   if(e.key==="Escape"){e.preventDefault();var op=m.querySelector("details.ms[open]");if(op){op.removeAttribute("open");op.querySelector("summary").focus()}else closeWheel();return}
