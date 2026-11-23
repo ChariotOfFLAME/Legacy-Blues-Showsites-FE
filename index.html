@@ -85,7 +85,12 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .brief legend{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0 6px}
 .brief .mrow{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
 .brief .mrow>span:first-child{font-family:var(--font-mono);font-weight:600;width:28px;flex:none;color:var(--muted)}
-.cardsec{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.cardsec{border-top:1px solid var(--line);padding-top:12px}
+.cardsec>summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;list-style:revert;padding:2px 0}
+.cardsec[open]>summary{margin-bottom:10px}
+.cardsec[open]>*:not(summary){margin-top:10px}
+.cardsec[open]>summary+*{margin-top:0}
+.kstat .kbad{color:var(--notviable);font-size:12.5px;font-weight:600}
 .cf{position:relative;flex:1;min-width:110px}
 .cf .bin{padding-right:46px;text-transform:uppercase}
 .cf .bin.over{border-color:var(--notviable)}
@@ -793,7 +798,7 @@ function notesRow(s){
       '<div class="imghint" id="imgmsg-'+id+'">'+(hasBackend()?'Resized to 1600 px and saved to the shared repo. It can take a minute to appear for others.':'Image upload needs the shared server.')+'</div></div></div>'+
     '<div class="cprow"><label class="cplab" for="b-'+id+'-cpDesc">CP:</label>'+bIn(s,"cpDesc","description","CP description","d")+'<span class="at" aria-hidden="true">@</span>'+bIn(s,"cpCoords","coordinates","CP coordinates","c")+'</div>'+
     '<div><label class="flab" for="b-'+id+'-obs">Obstructions/Complications</label><textarea class="notearea" id="b-'+id+'-obs" data-act="brief" data-id="'+id+'" data-field="obs" rows="3" maxlength="2000" placeholder="One per line">'+esc((s.brief||{}).obs||"")+'</textarea></div>'+
-    '<div class="crcl">'+crcl(s,"cr","CR · Crowd right, miles to CP")+crcl(s,"cl","CL · Crowd left, miles to CP")+'</div>'+cardSec(s)+
+    '<div class="crcl">'+crcl(s,"cl","CL · Crowd left, miles to CP")+crcl(s,"cr","CR · Crowd right, miles to CP")+'</div>'+cardSec(s)+
     '<div><label class="flab" for="note-'+id+'">Notes</label><textarea class="notearea" id="note-'+id+'" data-act="note" data-id="'+id+'" maxlength="4000" placeholder="Free-text notes for this site">'+esc(s.notes||"")+'</textarea></div>'+
     '</div></td></tr>';
 }
@@ -964,7 +969,7 @@ function paintCards(root){
   var list=(root||document).querySelectorAll("canvas.cardcv");
   for(var i=0;i<list.length;i++){var s=site(list[i].getAttribute("data-id"));if(s)drawCard(list[i],s)}
 }
-var GENMS=5000,genTimers={},kneeOn={};
+var GENMS=5000,genTimers={},kneeOn={},shortOpen={};
 function srcOf(s,p,n){return String((s.brief||{})[p+n]||"").trim()}
 /* state of one marker: ok / blank / error text */
 function cellState(s,p,n){
@@ -1016,6 +1021,7 @@ function cardUi(s){
     if(er){er.textContent=st.err?(p.toUpperCase()+" "+n+"m: "+st.err):"";er.hidden=!st.err}
   })});
   var bad=kneeErrors(s);
+  var ks=document.getElementById("kstat-"+s.id);if(ks)ks.innerHTML=kneeStat(s);
   if(bad.length)["ed","now"].forEach(function(w){kneeOn[w+s.id]=false;var o=document.getElementById("knee-"+w+"-"+s.id);if(o)o.innerHTML=kneeMsg(bad)});
   else paintCards();
 }
@@ -1054,9 +1060,13 @@ function cardSec(s){
       return '<div class="mrow"><span>'+n+'m</span>'+cIn(s,"k"+p+n+"a",0)+cIn(s,"k"+p+n+"b",1)+'</div><div class="cerr" id="cerr-'+s.id+'-'+p+n+'" role="alert" hidden></div>';
     }).join("")+'</fieldset>';
   }
-  return '<div class="cardsec"><div class="brhead"><b>Kneeboard short text</b></div>'+
+  return '<details class="cardsec" data-sid="'+s.id+'"'+(shortOpen[s.id]?' open':'')+'><summary><b>Kneeboard short text</b><span class="kstat" id="kstat-'+s.id+'" role="status">'+kneeStat(s)+'</span></summary>'+
     '<div class="hint">Filled in automatically 5 seconds after you stop typing a CR/CL line. Edit it freely; your edit is kept. Each line holds about '+CARD.MAXC+' characters.</div>'+
-    '<div class="crcl">'+side("cl","CL · left of the CP")+side("cr","CR · right of the CP")+'</div>'+kneeBlock("ed",s)+'</div>';
+    '<div class="crcl">'+side("cl","CL · left of the CP")+side("cr","CR · right of the CP")+'</div>'+kneeBlock("ed",s)+'</details>';
+}
+function kneeStat(s){
+  var bad=kneeErrors(s);
+  return bad.length?'<span class="kbad">⚠ Doesn\'t fit: '+bad.join(", ")+'</span>':'';
 }
 function imgIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>'}
 var AC_SUB={a4:"1979 A-4",f18:"F/A-18C"};
@@ -1086,7 +1096,7 @@ function renderNow(){
   var ol=String(b.obs||"").split("\n").map(function(l){return l.trim().replace(/^-\s*/,"")}).filter(Boolean);
   var obs=ol.length?'<div><div class="bk">Obstructions / complications</div><ul class="obs">'+ol.map(function(l){return '<li>'+esc(l)+'</li>'}).join("")+'</ul></div>':'';
   var anyLadder=BKEYS.some(function(k){return /^c[lr]\d$/.test(k)&&b[k]});
-  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div></div>'+kneeBlock("now",s):'';
+  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div></div>'+kneeBlock("now",s):'';
   var nt=s.notes?'<div><div class="bk">Notes</div><div class="nownotes">'+esc(s.notes)+'</div></div>':'';
   var brief=hasBrief(s)?cp+obs+lad+nt:'<div class="nobrief">No briefing for this site yet. Fill it in under Notes on the <button type="button" class="ghost" data-act="tab" data-tab="working">Working tab</button>.</div>';
   el.innerHTML='<div class="now">'+
@@ -1586,6 +1596,7 @@ function closeLightbox(){
   box.hidden=true;$("lbImg").removeAttribute("src");
   if(lbFrom&&document.body.contains(lbFrom))lbFrom.focus();lbFrom=null;
 }
+document.addEventListener("toggle",function(e){var d=e.target;if(d&&d.classList&&d.classList.contains("cardsec"))shortOpen[d.getAttribute("data-sid")]=d.open},true);
 document.addEventListener("click",function(e){
   var t=e.target;
   if(t&&t.getAttribute&&t.getAttribute("data-zoom")&&t.tagName==="IMG"){openLightbox(t);return}
