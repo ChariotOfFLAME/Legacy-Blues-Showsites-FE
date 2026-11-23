@@ -140,6 +140,7 @@ img[data-zoom]{cursor:zoom-in}
 .rungimg{margin:-2px 12px 8px 12px}
 .rungimg>summary{cursor:pointer;font-size:12px;color:var(--accent);padding:2px 0}
 .rungimg img{display:block;max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);margin-top:6px}
+.nowleft{display:flex;flex-direction:column;gap:16px;min-width:0}
 .imgbox{max-width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
 .imgbox img{display:block;width:100%;height:auto}
 .imgthumb{overflow:hidden;font-size:11px}
@@ -1120,7 +1121,7 @@ function renderNow(){
   var ol=String(b.obs||"").split("\n").map(function(l){return l.trim().replace(/^-\s*/,"")}).filter(Boolean);
   var obs=ol.length?'<div><div class="bk">Obstructions / complications</div><ul class="obs">'+ol.map(function(l){return '<li>'+esc(l)+'</li>'}).join("")+'</ul></div>':'';
   var anyLadder=BKEYS.some(function(k){return /^c[lr]\d$/.test(k)&&b[k]});
-  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div></div>'+kneeBlock("now",s):'';
+  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div></div>':'';
   var nt=s.notes?'<div><div class="bk">Notes</div><div class="nownotes">'+esc(s.notes)+'</div></div>':'';
   var brief=hasBrief(s)?cp+obs+lad+nt:'<div class="nobrief">No briefing for this site yet. Fill it in under Notes on the <button type="button" class="ghost" data-act="tab" data-tab="working">Working tab</button>.</div>';
   el.innerHTML='<div class="now">'+
@@ -1128,7 +1129,7 @@ function renderNow(){
     '<div class="nowhero"><div class="acbadge"><b>'+AC_LABEL[ac]+'</b><span>'+AC_SUB[ac]+'</span></div>'+
       '<div><h2 class="nowname">'+esc(s.name)+icons+'</h2>'+
       '<div class="nowmeta"><span>'+(s.map?esc(mapLabel(s.map)):'No theater set')+'</span>'+pill(s.rating[ac])+'<span>Flown <b>'+s.flights[ac]+'</b> time'+(s.flights[ac]===1?'':'s')+' in the '+AC_LABEL[ac]+'</span></div></div></div>'+
-    '<div class="nowgrid">'+(s.img?'<div class="imgbox"><img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+
+    '<div class="nowgrid"><div class="nowleft">'+(s.img?'<div class="imgbox"><img data-zoom="1" tabindex="0" src="'+esc(imgSrc(s.img))+'" alt="'+esc(s.name)+'" onerror="this.parentNode.className=\'imgph\';this.parentNode.innerHTML=\'<b>Image is still publishing</b><span>Give it a minute and reload.</span>\'"></div>':'<div class="imgph">'+imgIcon()+'<b>No image yet</b><span>Add one under Notes on the Working tab.</span></div>')+(anyLadder?kneeBlock("now",s):'')+'</div>'+
     '<div class="nowbrief">'+brief+'</div></div></div>';
   paintCards(el);
 }
