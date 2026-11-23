@@ -901,8 +901,8 @@ function paneHtml(ac,label){
 }
 /* ---------- persistence: Google Apps Script backend, with a browser copy as a fallback ---------- */
 var CONFIG={ENDPOINT:"https://script.google.com/macros/s/AKfycbyXFcjrshTYy60v00YpBk9CvKXea5YEE3j6GcXVNk14EjmL0bZQnf5vlp9BjgN8ntef1A/exec"}; /* the Web app URL from Apps Script (ends in /exec) */
-var LS_STATE="showSiteRotation.v1",LS_PASS="showSiteRotation.pass";
-var saving=false,again=false,saveTimer=null,serverVersion=null,online=false;
+var LS_STATE="showSiteRotation.v1",LS_PASS="showSiteRotation.pass",LS_BASE="showSiteRotation.base";
+var saving=false,again=false,saveTimer=null,serverVersion=null,online=false,conflicts=0;
 function hasBackend(){return /^https:\/\/script\.google\.com\//.test(CONFIG.ENDPOINT)}
 function setStatus(kind){
   var el=$("status"),tx=$("statusText");
@@ -964,8 +964,15 @@ function flush(){
   clearTimeout(saveTimer);saveTimer=null;
   if(saving){again=true;return}
   saving=true;
-  call({action:"save",state:cur()}).then(function(r){
-    if(r&&r.ok){serverVersion=r.version;setStatus("saved")}
+  var sent=clone(normalize(cur()));
+  call({action:"save",state:cur(),baseVersion:serverVersion}).then(function(r){
+    if(r&&r.ok){serverVersion=r.version;conflicts=0;setBase(sent);setStatus("saved")}
+    else if(r&&r.error==="conflict"&&r.state){
+      /* someone saved first: fold their changes in, then save again on top of theirs */
+      serverVersion=r.version;
+      if(++conflicts>6){setStatus("error");return}
+      applyRemote(r.state);again=true;
+    }
     else if(r&&r.error==="auth")showGate("That passcode didn't work.");
     else setStatus("error");
   },function(){setStatus("slow");saveTimer=setTimeout(flush,10000)}).then(function(){saving=false;if(again){again=false;flush()}});
@@ -976,10 +983,68 @@ function persist(){
   setStatus("saving");clearTimeout(saveTimer);saveTimer=setTimeout(flush,400);
 }
 function changed(){render();persist()}
+/* ---------- merging with the shared copy ----------
+   The server keeps one copy. Each save says which version it was based on; if someone else saved
+   first, the server refuses and sends its copy back. We then do a three-way merge: our changes since
+   we last synced (base) are laid over the server's copy, field by field, so nobody's edits are lost. */
+function isObj(x){return x&&typeof x==="object"&&!Array.isArray(x)}
+function deq(a,b){
+  if(a===b)return true;
+  if(!a||!b||typeof a!=="object"||typeof b!=="object")return false;
+  if(Array.isArray(a)!==Array.isArray(b))return false;
+  var ka=Object.keys(a),kb=Object.keys(b);
+  if(ka.length!==kb.length)return false;
+  for(var i=0;i<ka.length;i++){if(!Object.prototype.hasOwnProperty.call(b,ka[i])||!deq(a[ka[i]],b[ka[i]]))return false}
+  return true;
+}
+function m3(b,l,r,path){
+  if(deq(l,r))return l;
+  if(deq(l,b))return r;
+  if(deq(r,b))return l;
+  if(isObj(l)&&isObj(r)){
+    var o={},keys=Object.keys(l);
+    Object.keys(r).forEach(function(k){if(keys.indexOf(k)<0)keys.push(k)});
+    keys.forEach(function(k){o[k]=m3(isObj(b)?b[k]:undefined,l[k],r[k],path+"."+k)});
+    return o;
+  }
+  return l; /* same field changed on both sides: this device's edit, being the later one, wins */
+}
+function mergeState(b,l,r){
+  function idx(a){var m={};(a||[]).forEach(function(s){m[s.id]=s});return m}
+  var bm=idx(b.sites),lm=idx(l.sites),rm=idx(r.sites),out=[];
+  r.sites.forEach(function(rs){
+    var ls=lm[rs.id],bs=bm[rs.id];
+    if(ls){
+      var ms=m3(bs||ls,ls,rs,"site");
+      /* two people logged flights: keep both counts, even if both counted to the same number */
+      if(bs)["a4","f18"].forEach(function(k){
+        if(ls.flights[k]!==bs.flights[k]&&rs.flights[k]!==bs.flights[k]){ms=clone(ms);ms.flights[k]=Math.max(0,ls.flights[k]+rs.flights[k]-bs.flights[k])}
+      });
+      out.push(ms);
+    }
+    else if(!bs)out.push(rs);                    /* added by someone else */
+    else if(!deq(rs,bs))out.push(rs);            /* we deleted it, but they edited it: keep it */
+  });
+  l.sites.forEach(function(ls){
+    if(rm[ls.id])return;
+    if(!bm[ls.id])out.push(ls);                  /* added here */
+    else if(!deq(ls,bm[ls.id]))out.push(ls);     /* they deleted it, but we edited it: keep it */
+  });
+  return {v:2,migr:Math.max(l.migr||0,r.migr||0),sites:out,ac:m3(b.ac,l.ac,r.ac,"ac"),current:m3(b.current,l.current,r.current,"current")};
+}
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function getBase(){try{var x=localStorage.getItem(LS_BASE);return x?JSON.parse(x):null}catch(e){return null}}
+function setBase(o){try{localStorage.setItem(LS_BASE,JSON.stringify(o))}catch(e){}}
+/* Take the server's copy, keeping any edits made here since the last sync. Returns true if the page changed. */
 function applyRemote(d){
-  var old=!d.ac,n=normalize(d),mg=migrate(n);
-  if(!mg&&!old&&JSON.stringify(n)===JSON.stringify(cur()))return false;
-  S=n;render();localSave();if(mg||old)persist();
+  var old=!d.ac,remote=normalize(d),base=getBase(),local=normalize(cur());
+  var n=clone(remote);
+  if(base&&!deq(local,base))n=normalize(mergeState(base,local,remote));
+  var mg=migrate(n);
+  setBase(remote);
+  var pending=!deq(n,remote);
+  if(!mg&&!old&&deq(n,local)){if(pending)persist();return false}
+  S=n;render();localSave();if(mg||old||pending)persist();
   return true;
 }
 function loadServer(first){
