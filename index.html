@@ -83,8 +83,8 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .crcl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
 .brief fieldset{border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px;margin:0;min-width:0;display:flex;flex-direction:column;gap:6px}
 .brief legend{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0 6px}
-.brief label.mrow{display:flex;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
-.brief label.mrow span{font-family:var(--font-mono);font-weight:600;width:28px;flex:none;color:var(--muted)}
+.brief .mrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
+.brief .mrow>span:first-child{font-family:var(--font-mono);font-weight:600;width:28px;flex:none;color:var(--muted)}
 .imgrow{display:flex;gap:12px;align-items:center}
 .imgthumb{width:72px;height:48px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
 .imgthumb svg{width:24px;height:24px}
@@ -111,6 +111,10 @@ tr.notesrow td label{display:block;font-size:11px;text-transform:uppercase;lette
 .offbox{border-top:1px solid var(--line);margin-top:8px}
 .offbox>summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:revert}
 .offbox .meta{font-weight:400}
+.mrow .mimgbtn{white-space:nowrap}
+.rungimg{margin:-2px 12px 8px 12px}
+.rungimg>summary{cursor:pointer;font-size:12px;color:var(--accent);padding:2px 0}
+.rungimg img{display:block;max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);margin-top:6px}
 .imgbox{max-width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
 .imgbox img{display:block;width:100%;height:auto}
 .imgthumb{overflow:hidden;font-size:11px}
@@ -381,6 +385,8 @@ var LABEL={};RATINGS.forEach(function(r){LABEL[r[0]]=r[1]});
 var BKEYS=["cpDesc","cpCoords","obs","cr4","cr3","cr2","cr1","cl4","cl3","cl2","cl1"];
 function blankBrief(){var b={};BKEYS.forEach(function(k){b[k]=""});return b}
 function cleanBrief(x){var b=blankBrief();x=x||{};BKEYS.forEach(function(k){b[k]=String(x[k]||"").slice(0,k==="obs"?2000:400)});return b}
+var MSLOTS=[];["cr","cl"].forEach(function(p){[4,3,2,1].forEach(function(n){MSLOTS.push(p+n)})});
+function cleanMimg(x){var o={};x=x||{};MSLOTS.forEach(function(k){var v=String(x[k]||"");o[k]=/^images\/[A-Za-z0-9._-]{1,100}$/.test(v)?v:""});return o}
 function hasBrief(s){var b=s.brief||{};return !!(s.notes||BKEYS.some(function(k){return b[k]}))}
 function parseBrief(text){
   var b=blankBrief(),extra=[],obs=[],sec=null;
@@ -473,7 +479,7 @@ function normalize(d){
     if(!s||typeof s.id!=="string"||seen[s.id])return;
     seen[s.id]=1;
     var r=s.rating||{},f=s.flights||{};
-    sites.push({id:s.id,name:String(s.name||"").slice(0,120),map:String(s.map||"").slice(0,60),notes:String(s.notes||"").slice(0,4000),brief:cleanBrief(s.brief),fav:!!s.fav,photo:!!s.photo,img:/^images\/[A-Za-z0-9._-]{1,100}$/.test(String(s.img||""))?String(s.img):"",rating:{a4:vr(r.a4),f18:vr(r.f18)},flights:{a4:vf(f.a4),f18:vf(f.f18)}});
+    sites.push({id:s.id,name:String(s.name||"").slice(0,120),map:String(s.map||"").slice(0,60),notes:String(s.notes||"").slice(0,4000),brief:cleanBrief(s.brief),fav:!!s.fav,photo:!!s.photo,img:/^images\/[A-Za-z0-9._-]{1,100}$/.test(String(s.img||""))?String(s.img):"",mimg:cleanMimg(s.mimg),rating:{a4:vr(r.a4),f18:vr(r.f18)},flights:{a4:vf(f.a4),f18:vf(f.f18)}});
   });
   var ac={};
   AIR.forEach(function(p){
@@ -746,7 +752,11 @@ function bIn(s,f,ph,label,cls){
 }
 function crcl(s,p,title){
   return '<fieldset><legend>'+title+'</legend>'+[4,3,2,1].map(function(n){
-    return '<label class="mrow"><span>'+n+'m</span>'+bIn(s,p+n,"free text",p.toUpperCase()+" "+n+"m")+'</label>';
+    var sl=p+n,im=(s.mimg||{})[sl],busy=uploading[s.id+sl];
+    return '<div class="mrow"><span>'+n+'m</span>'+bIn(s,sl,"free text",p.toUpperCase()+" "+n+"m")+
+      '<button type="button" class="btn sm mimgbtn" data-act="pickimg" data-id="'+s.id+'" data-slot="'+sl+'"'+((!hasBackend()||busy)?' disabled':'')+' aria-label="'+(im?'Replace':'Add')+' image for '+p.toUpperCase()+' '+n+'m">'+(busy?'Uploading':im?'Replace image':'Add image')+'</button>'+
+      (im?'<button type="button" class="btn sm" data-act="rmimg" data-id="'+s.id+'" data-slot="'+sl+'" aria-label="Remove image for '+p.toUpperCase()+' '+n+'m">&times;</button>':'')+
+      '<input type="file" accept="image/*" class="imgfile" data-act="imgfile" data-id="'+s.id+'" data-slot="'+sl+'" hidden></div>';
   }).join("")+'</fieldset>';
 }
 function notesRow(s){
@@ -827,10 +837,11 @@ function render(){renderHeader();renderChips();renderMapFilter();renderRows();AI
 
 function imgIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>'}
 var AC_SUB={a4:"1979 A-4",f18:"F/A-18C"};
-function rungs(b,p){
+function rungs(b,p,s){
   return [4,3,2,1].map(function(n){
-    var v=String(b[p+n]||"").trim();
-    return '<div class="rung'+(v?'':' none')+'"><b>'+n+'m</b><span>'+(v?esc(v):'&mdash;')+'</span></div>';
+    var v=String(b[p+n]||"").trim(),im=s&&s.mimg&&s.mimg[p+n];
+    return '<div class="rung'+(v?'':' none')+'"><b>'+n+'m</b><span>'+(v?esc(v):'&mdash;')+'</span></div>'+
+      (im?'<details class="rungimg"><summary>Image</summary><img loading="lazy" src="'+esc(imgSrc(im))+'" alt="'+esc(p.toUpperCase()+" "+n+"m")+'" onerror="this.replaceWith(document.createTextNode(\'Still publishing, reload in a minute.\'))"></details>':'');
   }).join("");
 }
 function nowSw(ac){
@@ -852,7 +863,7 @@ function renderNow(){
   var ol=String(b.obs||"").split("\n").map(function(l){return l.trim().replace(/^-\s*/,"")}).filter(Boolean);
   var obs=ol.length?'<div><div class="bk">Obstructions / complications</div><ul class="obs">'+ol.map(function(l){return '<li>'+esc(l)+'</li>'}).join("")+'</ul></div>':'';
   var anyLadder=BKEYS.some(function(k){return /^c[lr]\d$/.test(k)&&b[k]});
-  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr")+'</div><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl")+'</div></div>':'';
+  var lad=anyLadder?'<div class="ladders"><div class="ladder"><h3>Crowd right (CR)</h3>'+rungs(b,"cr",s)+'</div><div class="ladder"><h3>Crowd left (CL)</h3>'+rungs(b,"cl",s)+'</div></div>':'';
   var nt=s.notes?'<div><div class="bk">Notes</div><div class="nownotes">'+esc(s.notes)+'</div></div>':'';
   var brief=hasBrief(s)?cp+obs+lad+nt:'<div class="nobrief">No briefing for this site yet. Fill it in under Notes on the <button type="button" class="ghost" data-act="tab" data-tab="working">Working tab</button>.</div>';
   el.innerHTML='<div class="now">'+
@@ -921,21 +932,22 @@ function shrink(file,q){
     im.src=u;
   });
 }
-function uploadImage(id,file){
-  var s=site(id);if(!s||!file||uploading[id])return;
+function uploadImage(id,file,slot){
+  var s=site(id),uk=id+(slot||"");if(!s||!file||uploading[uk])return;
+  var imgMsg=function(i,m){if(slot)toast(m);else{var e=document.getElementById("imgmsg-"+i);if(e)e.textContent=m}};
   if(!/^image\//.test(file.type)){imgMsg(id,"That isn't an image file.");return}
-  uploading[id]=true;renderRows();imgMsg(id,"Preparing the image");
+  uploading[uk]=true;renderRows();imgMsg(id,"Preparing the image");
   shrink(file,0.82).then(function(d){return d.length>1400000?shrink(file,0.6):d}).then(function(d){
     if(d.length>1400000)throw new Error("big");
     imgMsg(id,"Uploading");
-    return call({action:"upload",id:id,data:d.split(",")[1]}).then(function(r){
+    return call({action:"upload",id:slot?id+"-"+slot:id,data:d.split(",")[1]}).then(function(r){
       if(r&&r.ok&&r.path){
-        imgCache[r.path]=d;var t=site(id);if(t){t.img=r.path;persist()}
+        imgCache[r.path]=d;var t=site(id);if(t){if(slot){if(!t.mimg)t.mimg=cleanMimg();t.mimg[slot]=r.path}else t.img=r.path;persist()}
       }else if(r&&r.error==="auth"){showGate("That passcode didn't work.")}
       else throw new Error((r&&r.error)||"server");
     });
-  }).then(function(){delete uploading[id];renderRows();renderNow()},function(e){
-    delete uploading[id];renderRows();
+  }).then(function(){delete uploading[uk];renderRows();renderNow()},function(e){
+    delete uploading[uk];renderRows();
     imgMsg(id,e.message==="big"?"That image is still too large after resizing.":e.message==="bad"?"Couldn't read that image.":e.message==="github"?"The server couldn't save it to GitHub. Check the token in Script properties.":"Upload failed. Try again.");
   });
 }
@@ -1299,7 +1311,7 @@ document.addEventListener("click",function(e){
     if(openNotes[id]){var nta=document.getElementById("b-"+id+"-cpDesc");if(nta)nta.focus()}
   }
   else if(act==="pickimg"){var fi=el.parentNode.querySelector("input.imgfile");if(fi)fi.click()}
-  else if(act==="rmimg"){var rs=site(id);if(rs&&rs.img){rs.img="";persist();renderRows();renderNow()}}
+  else if(act==="rmimg"){var rs=site(id),sl=el.getAttribute("data-slot");if(rs&&sl&&rs.mimg&&rs.mimg[sl]){rs.mimg[sl]="";persist();renderRows();renderNow()}else if(rs&&!sl&&rs.img){rs.img="";persist();renderRows();renderNow()}}
   else if(act==="copybrief"){var cs=site(id);if(cs)copyText(briefText(cs),"Briefing copied")}
   else if(act==="openwheel")openWheel(ac);
   else if(act==="wclose")closeWheel();
@@ -1366,7 +1378,7 @@ document.addEventListener("change",function(e){
 });
 document.addEventListener("change",function(e){
   var t=e.target;if(!t||!t.classList||!t.classList.contains("imgfile"))return;
-  var f=t.files&&t.files[0];t.value="";if(f)uploadImage(t.getAttribute("data-id"),f);
+  var f=t.files&&t.files[0];t.value="";if(f)uploadImage(t.getAttribute("data-id"),f,t.getAttribute("data-slot")||"");
 });
 $("filterText").addEventListener("input",function(e){filterText=e.target.value;renderRows()});
 document.addEventListener("input",function(e){
