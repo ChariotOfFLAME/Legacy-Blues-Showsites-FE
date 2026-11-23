@@ -932,6 +932,12 @@ function shrink(file,q){
     im.src=u;
   });
 }
+/* remove a file from the repo once no site points at it any more */
+function dropImage(path){
+  if(!path||!hasBackend())return;
+  for(var i=0;i<S.sites.length;i++){var x=S.sites[i];if(x.img===path)return;if(x.mimg)for(var k in x.mimg)if(x.mimg[k]===path)return}
+  call({action:"delete",path:path}).catch(function(){});
+}
 function uploadImage(id,file,slot){
   var s=site(id),uk=id+(slot||"");if(!s||!file||uploading[uk])return;
   var imgMsg=function(i,m){if(slot)toast(m);else{var e=document.getElementById("imgmsg-"+i);if(e)e.textContent=m}};
@@ -942,7 +948,7 @@ function uploadImage(id,file,slot){
     imgMsg(id,"Uploading");
     return call({action:"upload",id:slot?id+"-"+slot:id,data:d.split(",")[1]}).then(function(r){
       if(r&&r.ok&&r.path){
-        imgCache[r.path]=d;var t=site(id);if(t){if(slot){if(!t.mimg)t.mimg=cleanMimg();t.mimg[slot]=r.path}else t.img=r.path;persist()}
+        imgCache[r.path]=d;var t=site(id);if(t){var old;if(slot){if(!t.mimg)t.mimg=cleanMimg();old=t.mimg[slot];t.mimg[slot]=r.path}else{old=t.img;t.img=r.path}persist();if(old&&old!==r.path)dropImage(old)}
       }else if(r&&r.error==="auth"){showGate("That passcode didn't work.")}
       else throw new Error((r&&r.error)||"server");
     });
@@ -1311,7 +1317,7 @@ document.addEventListener("click",function(e){
     if(openNotes[id]){var nta=document.getElementById("b-"+id+"-cpDesc");if(nta)nta.focus()}
   }
   else if(act==="pickimg"){var fi=el.parentNode.querySelector("input.imgfile");if(fi)fi.click()}
-  else if(act==="rmimg"){var rs=site(id),sl=el.getAttribute("data-slot");if(rs&&sl&&rs.mimg&&rs.mimg[sl]){rs.mimg[sl]="";persist();renderRows();renderNow()}else if(rs&&!sl&&rs.img){rs.img="";persist();renderRows();renderNow()}}
+  else if(act==="rmimg"){var rs=site(id),sl=el.getAttribute("data-slot");if(rs){var gone="";if(sl&&rs.mimg&&rs.mimg[sl]){gone=rs.mimg[sl];rs.mimg[sl]=""}else if(!sl&&rs.img){gone=rs.img;rs.img=""}if(gone){persist();renderRows();renderNow();dropImage(gone)}}}
   else if(act==="copybrief"){var cs=site(id);if(cs)copyText(briefText(cs),"Briefing copied")}
   else if(act==="openwheel")openWheel(ac);
   else if(act==="wclose")closeWheel();
